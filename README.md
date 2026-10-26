@@ -38,7 +38,7 @@ To put it online, upload the folder as is to any static host (GitHub Pages, Netl
 6. **Boulder Run.** A giant FUD boulder chases you. Run.
 7. **Birthday Chamber.** The 3-clue door, Teevincs, cake, and the SOL tip explosion.
 
-You fail if you lose all your hearts or the birthday timer runs out. Lava and pits cost a heart and send you back to the last torch. "Run it back" restarts the level.
+In easy mode (the default) you can't fail: just follow the waypoint to Teevincs.
 
 ## Customize
 
@@ -51,10 +51,20 @@ Every line of the intro and outro is plain text in `INTRO` / `OUTRO`. Each line 
 
 The same file holds the hints, clue texts, game-over quips, the end-screen ranks, `TIME_LIMIT` and `START_HEARTS`.
 
-### Voice, sound and touch feel: `js/config.js`
-- `VOICE`: every dialogue line is spoken aloud. Each character has their own pitch and speed, using the device's built-in voice. Short in-game shouts come from `BARKS`. For real recorded lines, add `voice: "assets/voice/line.mp3"` to any dialogue line.
-- `TOUCH.stickSensitivity` and `TOUCH.lookSensitivity` tune the joystick and the camera drag. Lower numbers are calmer.
-- On iPhone, sound plays even with the ringer switch on silent. Just tap START first.
+### Easy mode (on by default): `ASSIST` in `js/config.js`
+Aaliyah **can't die**. Hits only knock her back, and falling in lava puts her straight back on safe ground. There's no timer fail either: the clock just counts your run time. Just push the stick toward the golden **▼ waypoint** (it shows the distance to the next objective):
+- she **jumps gaps and spikes** by herself (`autoJump`),
+- **climbs ledges and vine walls** just by running into them (`autoClimb`),
+- **shoots** nearby enemies by herself with homing shots (`autoShoot`),
+- **pulls levers** just by walking up to them (`autoLever`).
+
+Set any of these to `false` for a harder, more manual game. Set `TIME_LIMIT` to a number of seconds to bring back the birthday countdown.
+
+### Voiceover: `assets/voice/` + `tools/make_voices.py`
+Every intro and outro line, hint, clue and in-game shout is pre-recorded: Aaliyah, Teevincs and a narrator each have their own voice. The recordings are generated from the text in `js/config.js` with the free Kokoro voice model. If you edit a line, re-run the script to re-record it (setup instructions are at the top of `tools/make_voices.py`). Until you do, the edited line falls back to the device's speech voice. Cutscene lines move on by themselves when the voice finishes (`VOICE.autoAdvance`).
+
+### Touch feel
+`TOUCH.stickSensitivity` and `TOUCH.lookSensitivity` tune the joystick and the camera drag. Lower numbers are calmer.
 
 ### Aaliyah's look
 - **Portrait** (dialogue box and title): `PORTRAITS.aaliyah`, currently `assets/aaliyah.jpg`.

@@ -159,3 +159,15 @@ body.touch.portrait.ingame #rotate { top: 96px; }
 }
 
 body.cine #hud, body.cine #touch, body.cine #joy { display: none !important; }
+
+/* ---------- waypoint marker (next objective) ---------- */
+#waypoint { position: fixed; left: 0; top: 0; z-index: 13; pointer-events: none; width: 0; height: 0; }
+#waypoint i, #waypoint b { position: absolute; left: 0; transform-origin: center; }
+#waypoint i { display: block; width: 44px; height: 44px; margin: -22px 0 0 -22px; font-style: normal; font-size: 34px; line-height: 44px; text-align: center;
+  color: var(--gold); text-shadow: 0 0 10px rgba(255,222,58,.9), 0 3px 0 #7a5410; animation: wpbob .8s ease-in-out infinite alternate; }
+#waypoint b { top: -50px; transform: translateX(-50%); font-family: Bungee, Impact, sans-serif; font-weight: 400; font-size: 13px; color: #fff;
+  background: rgba(20,6,40,.6); border-radius: 8px; padding: 1px 6px; white-space: nowrap; }
+#waypoint.edge i { animation: none; font-size: 40px; }
+#waypoint.edge b { top: 22px; }
+@keyframes wpbob { to { margin-top: -12px; } }
+body.cine #waypoint { display: none !important; }

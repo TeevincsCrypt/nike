@@ -76,40 +76,86 @@
     if (A.voiceUnlocked || !synth) return;
     try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); A.voiceUnlocked = true; } catch (e) {}
   };
+  // Recorded voiceover: assets/voice/manifest.json maps "who|config text" -> mp3 (made by tools/make_voices.py).
+  let manifest = {}, voiceSrc = null, voiceGain = null, speakingUntil = 0, lineEnd = null;
+  const raw = {}, decoded = {};
+  A.loadVoices = function () {
+    return fetch('assets/voice/manifest.json').then(r => r.ok ? r.json() : {}).then(m => { manifest = m || {}; }).catch(() => {});
+  };
+  function fetchRaw(file) {
+    if (!raw[file]) raw[file] = fetch('assets/voice/' + file).then(r => r.arrayBuffer()).catch(() => null);
+    return raw[file];
+  }
+  function getBuffer(file) {
+    if (!decoded[file]) decoded[file] = fetchRaw(file).then(ab => {
+      if (!ab || !A.ctx) { decoded[file] = null; return null; }
+      return new Promise(res => A.ctx.decodeAudioData(ab.slice(0), res, () => res(null)));
+    });
+    return decoded[file];
+  }
+  // warm the cache (downloads only; decoding happens once audio is unlocked)
+  A.preloadVoices = function (lines) { lines.forEach(([who, text]) => { const f = manifest[who + '|' + text]; if (f) fetchRaw(f); }); };
+  A.hasVoice = (who, text) => !!manifest[who + '|' + text];
+  A.isSpeaking = () => performance.now() < speakingUntil || (synth && synth.speaking);
+
   A.stopVoice = function () {
     try { if (synth) synth.cancel(); } catch (e) {}
     if (fileVoice) { fileVoice.pause(); fileVoice = null; }
+    if (voiceSrc) { try { voiceSrc.onended = null; voiceSrc.stop(); } catch (e) {} voiceSrc = null; }
+    speakingUntil = 0; lineEnd = null;
     duck(false);
   };
   A.voiceOn = () => VCFG().enabled !== false && !A.muted;
-  A.say = function (text, who, file) {
-    if (!A.voiceOn()) return false;
-    A.stopVoice();
-    if (file) {
-      fileVoice = new Audio(file); fileVoice.setAttribute('playsinline', '');
-      fileVoice.onended = () => duck(false); duck(true);
-      const pr = fileVoice.play(); if (pr && pr.catch) pr.catch(() => duck(false));
-      return true;
-    }
+  function tts(text, who, onEnd) {
     if (!synth || VCFG().tts === false) return false;
-    const clean = String(text).replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, '').replace(/\.{3}/g, ', ').replace(/!{2,}/g, '!').replace(/\?{2,}/g, '?').trim();
+    const clean = String(text).replace(/\{[a-z]+\}/g, '').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, '').replace(/\.{3}/g, ', ').replace(/!{2,}/g, '!').replace(/\?{2,}/g, '?').trim();
     if (!clean) return false;
     const c = VCFG()[who] || VCFG().narrator || {};
     const u = new SpeechSynthesisUtterance(clean);
     const v = pickVoice(who); if (v) u.voice = v;
-    u.pitch = c.pitch != null ? c.pitch : 1; u.rate = c.rate != null ? c.rate : 1; u.volume = c.volume != null ? c.volume : 1;
-    u.onend = u.onerror = () => duck(false);
+    u.pitch = c.pitch != null ? c.pitch : 1; u.rate = c.rate != null ? c.rate : 1; u.volume = 1;
+    u.onend = u.onerror = () => { duck(false); if (onEnd) onEnd(); };
     duck(true);
     try { synth.speak(u); } catch (e) { return false; }
     return true;
+  }
+  // Speak a line. `text` is the exact text from config.js (used to find the recording).
+  // onEnd fires when the line finishes. Returns true if something will be spoken.
+  A.say = function (text, who, file, onEnd) {
+    if (!A.voiceOn()) return false;
+    A.stopVoice();
+    who = who || 'aaliyah';
+    const rec = manifest[who + '|' + text];
+    if (rec && A.ctx) {
+      const token = {}; lineEnd = token;
+      speakingUntil = performance.now() + 8000;
+      getBuffer(rec).then(buf => {
+        if (lineEnd !== token) return;                 // superseded by another line
+        if (!buf) { speakingUntil = 0; if (!tts(text, who, onEnd) && onEnd) onEnd(); return; }
+        if (!voiceGain) { voiceGain = A.ctx.createGain(); voiceGain.gain.value = 1.15; voiceGain.connect(master); }
+        const src = A.ctx.createBufferSource(); src.buffer = buf; src.connect(voiceGain);
+        src.onended = () => { if (voiceSrc === src) { voiceSrc = null; speakingUntil = 0; duck(false); if (onEnd) onEnd(); } };
+        voiceSrc = src; duck(true); src.start();
+        speakingUntil = performance.now() + buf.duration * 1000 + 50;
+        if (A.onLineStart) A.onLineStart(buf.duration);
+      });
+      return true;
+    }
+    if (file) {
+      fileVoice = new Audio(file); fileVoice.setAttribute('playsinline', '');
+      fileVoice.onended = () => { duck(false); if (onEnd) onEnd(); }; duck(true);
+      const pr = fileVoice.play(); if (pr && pr.catch) pr.catch(() => duck(false));
+      return true;
+    }
+    return tts(text, who, onEnd);
   };
-  // short in-game shouts, rate-limited so they don't pile up
+  // short in-game shouts, rate-limited and never on top of a dialogue line
   A.bark = function (text, who) {
     if (!A.voiceOn() || VCFG().barks === false) return;
-    const now = performance.now(); if (now - lastBark < 2200) return;
-    try { if (synth && synth.speaking) return; } catch (e) {}
+    const now = performance.now(); if (now - lastBark < 1800 || A.isSpeaking()) return;
     lastBark = now; A.say(text, who || 'aaliyah');
   };
+
   A.resume = () => { if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume(); };
 
   function tone(type, f0, t, dur, vol, dest, f1, attack) {

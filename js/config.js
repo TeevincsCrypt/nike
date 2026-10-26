@@ -39,18 +39,30 @@ window.AALIYAH_CONFIG = {
     teevincsScale: 1
   },
 
-  // Voices. Uses the phone/computer's built-in speech voice, tuned per character.
-  // To use real recorded voice lines instead, add  voice: "assets/voice/line1.mp3"  to any dialogue line.
+  // Voiceover. Every line below is pre-recorded into assets/voice/ (see tools/make_voices.py).
+  // If you edit a line, re-run that script to re-record it — until then the device's speech voice is used.
   VOICE: {
-    enabled: true,       // speak dialogue lines
-    barks: true,         // short in-game shouts ("OW!", "YEET!")
-    aaliyah:  { pitch: 1.55, rate: 1.12, voiceNames: ["Samantha", "Karen", "Moira", "Tessa", "Zira", "Google US English", "Female"] },
-    teevincs: { pitch: 0.75, rate: 1.0,  voiceNames: ["Daniel", "Alex", "Fred", "Aaron", "David", "Google UK English Male", "Male"] },
-    narrator: { pitch: 0.5,  rate: 0.92, voiceNames: ["Daniel", "Alex", "Fred", "Google UK English Male", "Male"] }
+    enabled: true,       // speak dialogue lines, hints and clues
+    barks: true,         // short in-game shouts ("Ow!", "Yeet!")
+    autoAdvance: true,   // cutscene lines move on by themselves when the voice finishes
+    // fallback device-speech tuning (only used for lines without a recording)
+    aaliyah:  { pitch: 1.45, rate: 1.1, voiceNames: ["Samantha", "Karen", "Moira", "Tessa", "Zira", "Google US English", "Female"] },
+    teevincs: { pitch: 0.8, rate: 1.0,  voiceNames: ["Daniel", "Alex", "Fred", "Aaron", "Google UK English Male", "Male"] },
+    narrator: { pitch: 0.6, rate: 0.92, voiceNames: ["Daniel", "Alex", "Fred", "Google UK English Male", "Male"] }
+  },
+  // Easy mode helpers. Set any to false for a harder, more manual game.
+  ASSIST: {
+    invincible: true,     // Aaliyah can't die: hits just knock her back, lava puts her back on safe ground
+    autoJump: true,       // jumps gaps and spike strips by herself while running
+    autoClimb: true,      // climbs ledges up to ~2.4m just by running into them
+    autoShoot: true,      // fires at nearby enemies by herself (SHOOT button still works)
+    autoLever: true,      // pulls levers just by walking up to them
+    guideArrow: true      // golden arrow + light beam showing where to go next
   },
   BARKS: {
     start: ["Let's go!", "Teevincs, I'm coming!", "Birthday mission, go go go!"],
     hurt: ["Ow!", "Rude!", "My hat!", "Not today!", "Ouch!"],
+    lever: ["Clunk!", "Lever pulled!"],
     kill: ["Yeet!", "Bonk!", "Bye FUD!", "Get rugged!", "Too easy!"],
     clue: ["A clue!", "Ooh, a clue!", "Big brain moment!"],
     checkpoint: ["Checkpoint!", "Saved my vibes!"],
@@ -65,7 +77,7 @@ window.AALIYAH_CONFIG = {
     lookSensitivity: 0.55    // camera drag speed with the right thumb (0.2 – 1.5)
   },
 
-  TIME_LIMIT: 240,          // seconds until Teevincs' birthday (fail state)
+  TIME_LIMIT: 0,            // seconds until Teevincs' birthday; 0 = no time limit (just a run timer)
   START_HEARTS: 3,
   SOL_PER_FRAGMENT: 1,      // tip amount per collected fragment
   TEXT_SPEED: 50,           // dialogue letters per second
@@ -108,7 +120,7 @@ window.AALIYAH_CONFIG = {
     "CLUE: A footprint... in frosting. He went THIS way!"
   ],
   ALL_CLUES: "ALL 3 CLUES! The birthday door is unlocked!",
-  DOOR_LOCKED: "The door demands 3 clues. It's very picky. ({clues}/3)",
+  DOOR_LOCKED: "The door wants all 3 clues. Follow the arrow back!",
   DOOR_OPEN: "THE BIRTHDAY DOOR OPENS!!",
   CHASE_START: "RUUUUUUUN!!!",
   CHASE_END: "Boulder got rugged. LOL.",
@@ -117,17 +129,18 @@ window.AALIYAH_CONFIG = {
   PIT: ["I meant to do that.", "Lava? In THIS economy?", "Gravity is FUD."],
   LOW_TIME: "TIME IS RUNNING OUT!!",
   HINTS: {
-    courtyard: "Ruins! Jump the gap. Blast the FUD goblins with your SOL pistols!",
-    climb: "Too high to jump? Jump at the ledge to GRAB it, then jump again to pull up!",
-    traps: "Spikes, blades and darts. Tomb vibes. Time your runs!",
-    levers: "Two ancient levers. Press ACTION next to each one to open the gate.",
+    courtyard: "Just follow the golden arrow. I'll jump and shoot by myself!",
+    climb: "Ledges! I'll climb up if I just run into them.",
+    traps: "Spikes, blades and darts. Tomb vibes. Just keep running!",
+    levers: "Two ancient levers. I just have to walk up to them.",
     bridge: "Crumbling tiles over lava. Do NOT stand still!",
-    block: "That plate looks... block-shaped. Walk into the block to push it!",
+    block: "That plate looks block-shaped. Push the block onto it!",
     boulder: "Why is this hallway SO round...",
-    final: "I smell cake. He's close!!"
+    final: "I smell cake. He's close!"
   },
   LEVER: "CLUNK! ({n}/2)",
   PLATE: "GATE OPEN! Big brain block moment.",
+  GATE_OPEN: "Gate open! The ancient lever council approves.",
 
   GAME_OVER_TITLE: "RUGGED.",
   GAME_OVER_QUIPS: [

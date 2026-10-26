@@ -8,6 +8,8 @@
   const lerpAngle = (a, b, t) => { let d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; return a + d * t; };
   const angDiff = (a, b) => ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
   const STEP = 1 / 60, UP = new THREE.Vector3(0, 1, 0);
+  const ASSIST = Object.assign({ invincible: true, autoJump: true, autoClimb: true, autoShoot: true, autoLever: true, guideArrow: true }, CFG.ASSIST || {});
+  const TIMED = CFG.TIME_LIMIT > 0;
   const PH = { grav: 26, run: 6.8, walk: 2.8, push: 2.6, accel: 45, airAccel: 14, jump: 9.2, maxFall: 30, coyote: 0.12, buffer: 0.14, r: 0.3, h: 1.7 };
   const IS_TOUCH = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
   if (IS_TOUCH) document.body.classList.add('touch');
@@ -232,6 +234,61 @@
     fountain = new THREE.InstancedMesh(MD.makeCoinGeo(), MD.coinMats(), 90); fountain.frustumCulled = false; fountain.count = 0; add.add(fountain);
     fountainCoins = [];
     initParticles(add);
+    buildGuide(add);
+  }
+  /* ------------- guide: arrow over Aaliyah's head + light beam on the next objective ------------- */
+  let objectives = [], guideArrow = null, guideBeam = null;
+  function buildGuide(add) {
+    objectives = [];
+    W.clues.forEach(c => objectives.push({ x: () => c.x, y: () => c.y - 0.9, z: c.z, done: () => c.taken }));
+    W.levers.forEach(l => objectives.push({ x: () => l.x, y: () => l.y, z: l.z, done: () => l.on }));
+    const b = W.block;
+    // block: first guide her to the left side of it, then point at the plate so she pushes it there
+    objectives.push({ x: () => P.pos.x < b.min.x - 0.1 && Math.abs(P.pos.z - (b.min.z + b.max.z) / 2) < 1.2 ? W.plate.x : b.min.x - 1.0,
+                      y: () => 0, z: (b.min.z + b.max.z) / 2, done: () => !!b.locked });
+    objectives.push({ x: () => 0, y: () => 0, z: -207, done: () => !W.door.active || !!W.door.opening });
+    objectives.push({ x: () => W.teevincs.x, y: () => 0, z: W.teevincs.z, done: () => false });
+    objectives.sort((p, q) => q.z - p.z);
+    if (!ASSIST.guideArrow) return;
+    guideArrow = $('waypoint');
+    guideBeam = new THREE.Group();
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 14, 16, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffde3a, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    beam.position.y = 7; guideBeam.add(beam);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.85, 24), new THREE.MeshBasicMaterial({ color: 0xffde3a, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; guideBeam.add(ring); guideBeam.ring = ring;
+    add.add(guideBeam);
+  }
+  // doorways between rooms (all centred on x=0): the arrow leads through them instead of into walls
+  const DOORWAYS = [-62.5, -96.5, -124.5, -128.2, -142.6, -158.5, -205.5];   // incl. both ends of the tile bridge
+  function guideTarget() {
+    const o = objectives.find(q => !q.done()); if (!o) return null;
+    const pz = P.pos.z, tz = o.z;
+    let door = null;
+    if (tz < pz) { for (const d of DOORWAYS) if (d < pz - 0.3 && d > tz) { door = { x: 0, y: 0, z: d - 1.5 }; break; } }
+    else { for (let i = DOORWAYS.length - 1; i >= 0; i--) { const d = DOORWAYS[i]; if (d > pz + 0.3 && d < tz) { door = { x: 0, y: 0, z: d + 1.5 }; break; } } }
+    if (door && Math.abs(P.pos.x) > 1.2 && Math.abs(pz - door.z) < 1.6) door.z = pz - Math.sign(pz - door.z || 1) * 0.1; // line up with the opening
+    return { o, t: door || { x: o.x(), y: o.y(), z: o.z } };
+  }
+  function updateGuide() {
+    if (!guideArrow) return;
+    const g = state === 'play' ? guideTarget() : null;
+    guideBeam.visible = !!g; guideArrow.style.display = g ? '' : 'none';
+    if (!g) return;
+    const o = g.o, ox = g.t.x, oy = g.t.y, dx = ox - P.pos.x, dz = g.t.z - P.pos.z, d = Math.hypot(dx, dz);
+    guideBeam.position.set(o.x(), o.y(), o.z); guideBeam.ring.scale.setScalar(1 + Math.sin(G.t * 4) * 0.15);
+    // on-screen waypoint marker: over the target when visible, pinned to the screen edge when not
+    tmpV.set(ox, oy + 2.2, g.t.z).project(camera);
+    const behind = tmpV.z > 1; let sx = tmpV.x, sy = tmpV.y;
+    if (behind) { sx = -sx; sy = -1; }
+    const edge = Math.max(Math.abs(sx), Math.abs(sy)), m = 0.86, off = edge > m || behind;
+    if (off) { const k = m / Math.max(edge, 1e-3); sx *= k; sy *= k; }
+    const px = (sx * 0.5 + 0.5) * innerWidth, py = Math.max(110, Math.min(innerHeight - 40, (-sy * 0.5 + 0.5) * innerHeight));
+    guideArrow.style.transform = 'translate(' + px.toFixed(0) + 'px,' + py.toFixed(0) + 'px)';
+    guideArrow.classList.toggle('edge', off);
+    guideArrow.querySelector('i').style.transform = off ? 'rotate(' + (Math.atan2(-sx, -sy) * 180 / Math.PI).toFixed(0) + 'deg)' : '';
+    const dist = Math.round(Math.hypot(o.x() - P.pos.x, o.z - P.pos.z));
+    if (guideArrow.__d !== dist) { guideArrow.__d = dist; guideArrow.querySelector('b').textContent = dist + 'm'; }
   }
   let reticle = null, fountain = null, fountainCoins = [];
 
@@ -317,10 +374,16 @@
   }
   function fmtTime(s) { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
   function toast(msg, dur) { toastEl.textContent = fmt(msg); toastEl.classList.add('show'); toastTimer = dur || 2.6; }
+  // toast + Aaliyah says it out loud (uses the recorded line when there is one)
+  function toastSay(msg, dur) {
+    toast(msg, dur);
+    if (!DLG.active && AU.voiceOn()) AU.say(msg, 'aaliyah');
+  }
   function slam(text) { slamEl.textContent = fmt(text); slamEl.classList.remove('go'); void slamEl.offsetWidth; slamEl.classList.add('go'); slamTimer = 1.8; shake(0.25, 0.4); }
   function shake(mag, dur) { G.shakeMag = Math.max(G.shakeMag, mag); G.shakeT = Math.max(G.shakeT, dur || 0.3); }
 
   /* ============================== DIALOGUE ============================== */
+  const VCFG = CFG.VOICE || {};
   const DLG = { el: $('dialogue'), lines: [], i: -1, shown: 0, full: '', done: null, active: false, blip: 0, who: '' };
   const dlgName = $('dlg-name'), dlgText = $('dlg-text'), dlgPortrait = $('dlg-portrait'), dlgWrap = $('dlg-portrait-wrap');
   let teevPortrait = null;
@@ -337,7 +400,12 @@
     dlgWrap.classList.remove('shaky');
     if (ln.shake) { shake(0.2, 0.45); void dlgWrap.offsetWidth; dlgWrap.classList.add('shaky'); }
     if (ln.sfx) AU.sfx(ln.sfx);
-    DLG.spoken = AU.say(DLG.full, who, ln.voice);
+    // speak the exact config text (that's the key for the recorded voice file)
+    DLG.speed = CFG.TEXT_SPEED || 50; DLG.voiceDone = false; DLG.autoT = -1;
+    const lineNo = DLG.i;
+    AU.onLineStart = dur => { if (DLG.i === lineNo) DLG.speed = Math.max(18, DLG.full.length / Math.max(0.4, dur * 0.9)); };
+    DLG.spoken = AU.say(ln.text || '', who, ln.voice, () => { if (DLG.i === lineNo) DLG.voiceDone = true; });
+    if (!DLG.spoken) DLG.voiceDone = true;
     if (ln.slam) slam(ln.slam);
     if (ln.event) dialogueEvent(ln.event);
   }
@@ -347,8 +415,13 @@
       if (DLG.shown < DLG.full.length) { DLG.shown = DLG.full.length; dlgText.textContent = DLG.full; }
       else { nextLine(); return; }
     }
+    // auto-advance once the voice has finished (or after reading time when there's no voice)
+    if (VCFG.autoAdvance !== false && DLG.shown >= DLG.full.length && DLG.voiceDone) {
+      if (DLG.autoT < 0) DLG.autoT = DLG.spoken ? 0.45 : 0.9 + DLG.full.length * 0.03;
+      DLG.autoT -= dt; if (DLG.autoT <= 0) { nextLine(); return; }
+    }
     if (DLG.shown < DLG.full.length) {
-      const before = Math.floor(DLG.shown); DLG.shown = Math.min(DLG.full.length, DLG.shown + dt * (CFG.TEXT_SPEED || 50));
+      const before = Math.floor(DLG.shown); DLG.shown = Math.min(DLG.full.length, DLG.shown + dt * (DLG.speed || 50));
       const now = Math.floor(DLG.shown);
       if (now !== before) { dlgText.textContent = DLG.full.slice(0, now); if (!DLG.spoken && (DLG.blip++ % 2) === 0 && DLG.full[now - 1] !== ' ') AU.blip(DLG.who); }
     }
@@ -366,14 +439,15 @@
     setHud('hearts', '❤'.repeat(Math.max(0, P.hearts)) + '♡'.repeat(Math.max(0, CFG.START_HEARTS - P.hearts)));
     setHud('sol', String(P.sol));
     setHud('clues', P.clues + '/3');
-    setHud('timer', fmtTime(timeLeft));
-    const low = timeLeft < 30; if (hudCache.low !== low) { hudCache.low = low; hud.timerBox.classList.toggle('low', low); }
+    setHud('timer', fmtTime(TIMED ? timeLeft : stats.time));
+    const low = TIMED && timeLeft < 30; if (hudCache.low !== low) { hudCache.low = low; hud.timerBox.classList.toggle('low', low); }
     const prog = clamp((W.start.z - P.pos.z) / (W.start.z - W.teevincs.z), 0, 1);
     const pw = Math.round(prog * 100) + '%'; if (hudCache.prog !== pw) { hudCache.prog = pw; hud.prog.style.width = pw; }
     const near = nearInteract() ? '1' : '0'; if (hudCache.near !== near) { hudCache.near = near; hud.act.classList.toggle('hot', near === '1'); }
   }
 
   /* ============================== GAME FLOW ============================= */
+  const safeA = new THREE.Vector3(), safeB = new THREE.Vector3(); let safeT = 0;
   let introLines = null, introT = 0, outroT = 0, doorMsgCd = 0, plateMsgCd = 0, lowWarned = false, rumbleT = 0;
   function newPlayer() {
     return { pos: new THREE.Vector3(W.start.x, W.start.y, W.start.z), vel: new THREE.Vector3(), onGround: false, ground: null, facing: Math.PI,
@@ -387,7 +461,9 @@
     if (!rig) setupPlayerModel();
     worldGroup.add(rig.root); if (gltf) worldGroup.add(gltf.root);
     stats = { time: 0, hits: 0, falls: 0, kills: 0 };
-    timeLeft = CFG.TIME_LIMIT; lowWarned = false; tipping = false; respawn = { x: W.start.x, y: W.start.y, z: W.start.z };
+    timeLeft = CFG.TIME_LIMIT; lowWarned = false; safeA.set(W.start.x, W.start.y, W.start.z); safeB.copy(safeA);
+    $('hud-timer-label').textContent = TIMED ? '🎂 BDAY IN' : '🎂 TIME';
+    hud.hearts.style.display = ASSIST.invincible ? 'none' : ''; tipping = false; respawn = { x: W.start.x, y: W.start.y, z: W.start.z };
     hideOverlays(); paused = false; document.body.classList.add('ingame');
     cam.yaw = 0; cam.pitch = 0.3; for (const k in hudCache) delete hudCache[k];
     if (withIntro) {
@@ -405,8 +481,10 @@
     P.pos.set(W.start.x, W.start.y, W.start.z); P.vel.set(0, PH.jump * 0.9, 0); P.onGround = false; P.jumping = true; P.facing = Math.PI;
     cam.yaw = 0; cam.dist = 5.2; cam.pitch = 0.3; cam.lastManual = -99;
     AU.music('raid'); AU.sfx('jump'); AU.stopVoice(); bark('start'); slam(rpick(['LET\'S GOOO!', 'FIND TEEVINCS!', 'GO GO GO!']));
-    if (IS_TOUCH) toast('Left thumb: move · Right thumb: look · Hold SHOOT to blast', 3.5);
-    else toast('WASD move · Mouse look (click) · SPACE jump · J / click shoot · F action', 3.5);
+    if (!ASSIST.autoJump) {
+      if (IS_TOUCH) toast('Left thumb: move · Right thumb: look · Hold SHOOT to blast', 3.5);
+      else toast('WASD move · Mouse look (click) · SPACE jump · J / click shoot · F action', 3.5);
+    }
   }
   function bark(kind, who) { const l = CFG.BARKS && CFG.BARKS[kind]; if (l && l.length) AU.bark(rpick(l), who); }
   function startFromTitle(withIntro) { removeTitleScene(); AU.unlock(); startRun(withIntro); }
@@ -513,8 +591,13 @@
     }
     const spotX = P.pos.x - nx * 0.55, spotZ = P.pos.z - nz * 0.55;
     if (boxBlocked(spotX, top + 0.02, spotZ, PH.r - 0.03, PH.h - 0.05)) return false;
-    if (P.onGround) return diff > 0.38 && diff <= 1.0 ? startMantle(top, nx, nz, true) : false;
+    if (P.onGround) {
+      if (diff > 0.38 && diff <= 1.0) return startMantle(top, nx, nz, true);
+      if (ASSIST.autoClimb && diff > 1.0 && diff <= 2.45) return startMantle(top, nx, nz, false);
+      return false;
+    }
     if (diff > 0.25 && diff <= 1.25) return startMantle(top, nx, nz, true);
+    if (ASSIST.autoClimb && diff > 1.25 && diff <= 2.45) return startMantle(top, nx, nz, false);
     if (diff > 1.25 && diff <= 2.4 && P.vel.y < 6) {
       P.st = 'hang'; P.hang = { s, nx, nz, top }; P.vel.set(0, 0, 0); P.facing = Math.atan2(-nx, -nz);
       P.pos.y = top - 2.0; P.hangHold = 0; AU.sfx('stomp'); shake(0.05, 0.1);
@@ -525,10 +608,12 @@
 
   function hurt(src, dmg) {
     if (P.inv > 0 || state !== 'play') return;
-    P.hearts -= dmg || 1; stats.hits++; P.inv = 1.3; P.hurtT = 0.4;
+    if (!ASSIST.invincible) P.hearts -= dmg || 1;
+    stats.hits++; P.inv = ASSIST.invincible ? 1.0 : 1.3; P.hurtT = ASSIST.invincible ? 0.25 : 0.4;
     if (P.st === 'hang' || P.st === 'climb' || P.st === 'mantle') P.st = 'move';
     tmpV.set(P.pos.x - src.x, 0, P.pos.z - src.z); if (tmpV.lengthSq() < 0.01) tmpV.set(0, 0, 1); tmpV.normalize();
-    P.vel.set(tmpV.x * 5, 6, tmpV.z * 5); P.onGround = false; P.jumping = false;
+    const kb = ASSIST.invincible ? 3.2 : 5;
+    P.vel.set(tmpV.x * kb, ASSIST.invincible ? 4.5 : 6, tmpV.z * kb); P.onGround = false; P.jumping = false;
     AU.sfx('hit'); shake(0.25, 0.3); bark('hurt');
     burst(P.pos.x, P.pos.y + 1.2, P.pos.z, 18, ['#ff4060', '#ffffff', '#ffcc3a'], 4);
     floatText(rpick(CFG.HURT), tmpV2.set(P.pos.x, P.pos.y + 2.2, P.pos.z), '#ff6b81');
@@ -536,17 +621,23 @@
   }
   function pitFall() {
     if (state !== 'play') return;
-    P.hearts--; stats.falls++; AU.sfx('hit'); shake(0.3, 0.3);
+    if (!ASSIST.invincible) P.hearts--;
+    stats.falls++; AU.sfx('hit'); shake(0.3, 0.3);
     burst(P.pos.x, -1.4, P.pos.z, 40, ['#ff5a1f', '#ffd23f', '#ffffff'], 6, { lift: 3 });
     if (P.hearts <= 0) { gameOver('dead'); return; }
-    P.pos.set(respawn.x, respawn.y + 0.05, respawn.z); P.vel.set(0, 0, 0); P.inv = 1.6; P.st = 'move'; P.hang = null; P.climbW = null;
-    toast(rpick(CFG.PIT), 2); bark('pit');
+    const rp = ASSIST.invincible ? safeB : respawn;   // easy mode: straight back to the last safe ground
+    P.pos.set(rp.x, rp.y + 0.05, rp.z); P.vel.set(0, 0, 0); P.inv = 1.6; P.st = 'move'; P.hang = null; P.climbW = null;
+    toastSay(rpick(CFG.PIT), 2);
     const B = W.boulderState;
-    if (B.triggered && !B.done) { B.triggered = false; if (B.mesh) { worldGroup.remove(B.mesh); B.mesh = null; } AU.setTempo(172); W.hurdles.forEach(h => { h.active = true; h.mesh.visible = true; }); }
+    if (B.triggered && !B.done && !ASSIST.invincible) { B.triggered = false; if (B.mesh) { worldGroup.remove(B.mesh); B.mesh = null; } AU.setTempo(172); W.hurdles.forEach(h => { h.active = true; h.mesh.visible = true; }); }
   }
 
   /* ============================== PLAYER ================================ */
   const wish = new THREE.Vector3();
+  function spikeAt(x, z) {
+    for (const sp of W.spikes) if (x > sp.min.x - 0.3 && x < sp.max.x + 0.3 && z > sp.min.z - 0.3 && z < sp.max.z + 0.3) return true;
+    return false;
+  }
   function nearInteract() {
     if (!W) return null;
     for (const l of W.levers) if (!l.on && Math.hypot(l.x - P.pos.x, l.z - P.pos.z) < 1.7 && Math.abs(l.y - P.pos.y) < 1.2) return l;
@@ -562,14 +653,14 @@
     if (p.onGround) p.coyote = PH.coyote; else p.coyote -= dt;
 
     // ---- interaction (levers)
-    if (pressed.action) {
+    if (pressed.action || ASSIST.autoLever) {
       const l = nearInteract();
       if (l) {
         l.on = true; AU.sfx('lever'); shake(0.1, 0.2);
         const n = W.levers.filter(q => q.on).length;
         floatText(fmt(CFG.LEVER).replace('{n}', n), tmpV2.set(l.x, l.y + 2, l.z), '#ffde3a');
         burst(l.x, l.y + 1, l.z, 16, ['#ffde3a', '#ffffff'], 3);
-        if (n === W.levers.length) openGate(W.gate1, 'GATE OPEN! The ancient lever council approves.');
+        if (n === W.levers.length) openGate(W.gate1, CFG.GATE_OPEN || 'Gate open!');
       }
     }
 
@@ -621,15 +712,28 @@
     if (control || p.onGround) { if (dl <= acc) { p.vel.x = tvx; p.vel.z = tvz; } else { p.vel.x += dvx / dl * acc; p.vel.z += dvz / dl * acc; } }
     p.speed = Math.hypot(p.vel.x, p.vel.z);
     // facing
-    const shooting = (held.shoot || pressed.shoot) && control;
-    if (shooting && p.target) p.facing = lerpAngle(p.facing, Math.atan2(p.target.pos.x - p.pos.x, p.target.pos.z - p.pos.z), Math.min(1, dt * 30));
+    const tgtD = p.target && p.target.alive ? Math.hypot(p.target.pos.x - p.pos.x, p.target.pos.z - p.pos.z) : 99;
+    const manualShoot = held.shoot || pressed.shoot, autoFire = ASSIST.autoShoot && tgtD < 14;
+    const shooting = (manualShoot || autoFire) && control;
+    if (shooting && p.target && (manualShoot || inp.m < 0.1)) p.facing = lerpAngle(p.facing, Math.atan2(p.target.pos.x - p.pos.x, p.target.pos.z - p.pos.z), Math.min(1, dt * 30));
     else if (inp.m > 0.1 && control) p.facing = lerpAngle(p.facing, Math.atan2(wish.x, wish.z), Math.min(1, dt * (IS_TOUCH ? 9 : 14)));
     // jump
+    if (ASSIST.autoJump && p.onGround && control && p.speed > 2.2 && inp.m > 0.3 && p.jumpBuf <= 0) {
+      const dx = p.vel.x / p.speed, dz = p.vel.z / p.speed, ax = p.pos.x + dx * 0.75, az = p.pos.z + dz * 0.75;
+      if (groundAt(ax, az, p.pos.y + 0.1) < p.pos.y - 0.8 || spikeAt(ax, az)) {
+        outer: for (let d = 1.6; d <= 4.6; d += 0.5) for (const side of [0, 0.6, -0.6]) {
+          const lx = p.pos.x + dx * d - dz * side, lz = p.pos.z + dz * d + dx * side;
+          const g = groundAt(lx, lz, p.pos.y + 0.6);
+          if (g > p.pos.y - 0.7 && !spikeAt(lx, lz)) { p.jumpBuf = PH.buffer; p.autoJumped = true; break outer; }
+        }
+      }
+    }
     if (p.jumpBuf > 0 && p.coyote > 0 && control) {
       p.vel.y = PH.jump; p.jumpBuf = 0; p.coyote = 0; p.onGround = false; p.jumping = true; AU.sfx('jump');
       burst(p.pos.x, p.pos.y + 0.05, p.pos.z, 8, ['#f3d9a4', '#ffffff'], 2, { grav: 2, life: 0.4 });
     }
-    if (p.jumping && p.vel.y > 2 && !held.jump) { p.vel.y *= 0.55; p.jumping = false; }
+    if (p.jumping && p.vel.y > 2 && !held.jump && !p.autoJumped) { p.vel.y *= 0.55; p.jumping = false; }
+    if (p.onGround && p.vel.y <= 0) p.autoJumped = false;
     if (p.vel.y <= 0) p.jumping = false;
     p.vel.y = Math.max(p.vel.y - PH.grav * dt, -PH.maxFall);
 
@@ -651,10 +755,13 @@
     if (cz) { p.vel.z = 0; }
     const c = cx || cz;
     if (c && control && inp.m > 0.3) tryLedge(c, wish);
+    if (p.onGround && p.ground && p.ground.kind === 'static' && p.st === 'move' && !spikeAt(p.pos.x, p.pos.z)) {
+      safeT -= dt; if (safeT <= 0) { safeT = 0.35; safeB.copy(safeA); safeA.copy(p.pos); }
+    }
     // fell off something while running: allow a quick grab of the ledge we came from? (keep simple)
 
     // ---- shooting
-    if (pressed.shoot || p.retargetT <= 0 || (p.target && !p.target.alive)) { p.retargetT = 0.15; p.target = findTarget(held.shoot || pressed.shoot); }
+    if (pressed.shoot || p.retargetT <= 0 || (p.target && !p.target.alive)) { p.retargetT = 0.15; p.target = findTarget(held.shoot || pressed.shoot || ASSIST.autoShoot); }
     if (shooting && p.st === 'move' && p.shootCd <= 0) fireBolt();
     p.shootT = shooting ? 0.25 : Math.max(0, p.shootT - dt);
   }
@@ -673,7 +780,7 @@
   }
   function openGate(g, msg) {
     if (!g || g.opening) return;
-    g.opening = true; AU.sfx('gate'); shake(0.2, 0.6); toast(msg, 2.6);
+    g.opening = true; AU.sfx('gate'); shake(0.2, 0.6); toastSay(msg, 2.6);
   }
 
   /* ============================== COMBAT ================================ */
@@ -834,10 +941,12 @@
       if (c.taken) continue;
       c.mesh.rotation.y = t * 1.5; c.mesh.position.y = c.y + Math.sin(t * 2) * 0.12; c.halo.rotation.z = t;
       if (playing && Math.hypot(c.x - p.pos.x, c.z - p.pos.z) < 0.9 && Math.abs(c.y - (p.pos.y + 0.9)) < 1.3) {
-        c.taken = true; c.mesh.visible = false; p.clues++; AU.sfx('clue'); shake(0.15, 0.25); bark('clue');
+        c.taken = true; c.mesh.visible = false; p.clues++; AU.sfx('clue'); shake(0.15, 0.25);
         burst(c.x, c.y, c.z, 40, ['#ffde3a', '#ffffff', '#14F195'], 5, { grav: 3 });
         floatText('CLUE ' + p.clues + '/3!', tmpV2.set(c.x, c.y + 0.8, c.z), '#ffde3a');
-        toast(CFG.CLUES[(p.clues - 1) % CFG.CLUES.length] + (p.clues >= 3 ? '  —  ' + CFG.ALL_CLUES : ''), 3.8);
+        const clueTxt = CFG.CLUES[(p.clues - 1) % CFG.CLUES.length];
+        toast(clueTxt + (p.clues >= 3 ? '  —  ' + CFG.ALL_CLUES : ''), 4.5);
+        AU.say(clueTxt, 'aaliyah', null, p.clues >= 3 ? () => AU.say(CFG.ALL_CLUES, 'aaliyah') : null);
         W.sockets[p.clues - 1].material.color.set(0xffde3a); W.sockets[p.clues - 1].material.emissive = new THREE.Color(0xaa7700);
       }
     }
@@ -853,13 +962,13 @@
       if (!k.lit && playing && p.pos.z < k.z + 0.5 && p.st === 'move' && p.onGround) {
         k.lit = true; respawn = { x: k.x + 1.2 * Math.sign(-k.x || 1), y: k.y, z: k.z };
         k.flame.material.color.set(0x14f195); k.flame.material.emissive.set(0x9945ff); k.flame.scale.setScalar(1.4);
-        if (k.z < W.start.z - 2) { AU.sfx('checkpoint'); bark('checkpoint'); floatText(rpick(CFG.CHECKPOINT), tmpV2.set(k.x, 2.4, k.z), '#ffde3a'); }
+        if (k.z < W.start.z - 2) { AU.sfx('checkpoint'); const ct = rpick(CFG.CHECKPOINT); AU.bark(ct); floatText(ct, tmpV2.set(k.x, 2.4, k.z), '#ffde3a'); }
         burst(k.x, 1.8, k.z, 20, ['#14F195', '#9945FF'], 2.5, { grav: -2 });
       }
     }
     for (const f of W.flames) f.scale.y = 1 + Math.sin(t * 15 + f.position.x * 3 + f.position.z) * 0.18;
     // section hints
-    for (const sct of W.sections) if (!sct.seen && playing && p.pos.z < sct.z) { sct.seen = true; if (CFG.HINTS[sct.id]) toast(CFG.HINTS[sct.id], 3.4); }
+    for (const sct of W.sections) if (!sct.seen && playing && p.pos.z < sct.z) { sct.seen = true; if (CFG.HINTS[sct.id]) toastSay(CFG.HINTS[sct.id], 3.6); }
     // lava scroll
     W.textures.lava.offset.y = (t * 0.03) % 1; W.textures.lava.offset.x = Math.sin(t * 0.3) * 0.05;
     // levers
@@ -882,7 +991,7 @@
     }
     // collapsing tiles
     for (const tl of W.tiles) {
-      if (tl.state === 0 && p.ground === tl) { tl.state = 1; tl.t = 0.55; AU.sfx('rumble'); }
+      if (tl.state === 0 && p.ground === tl) { tl.state = 1; tl.t = 1.2; AU.sfx('rumble'); }
       else if (tl.state === 1) { tl.t -= dt; tl.mesh.position.x = tl.home.x + (Math.random() - 0.5) * 0.08; if (tl.t <= 0) { tl.state = 2; tl.active = false; tl.vy = 0; } }
       else if (tl.state === 2) { tl.vy += 20 * dt; tl.mesh.position.y -= tl.vy * dt; if (tl.mesh.position.y < -4) { tl.state = 3; tl.t = 3.5; tl.mesh.visible = false; } }
       else if (tl.state === 3) { tl.t -= dt; if (tl.t <= 0) { tl.state = 0; tl.active = true; tl.mesh.visible = true; tl.mesh.position.set(tl.home.x, -0.25, tl.home.z); } }
@@ -926,14 +1035,14 @@
     // door proximity
     doorMsgCd -= dt;
     if (playing && W.door.active && !W.door.opening && Math.abs(p.pos.x) < 2.5 && p.pos.z < -205 && p.pos.z > -210.5) {
-      if (p.clues >= 3) { W.door.opening = true; AU.sfx('door'); bark('door'); shake(0.3, 1.4); toast(CFG.DOOR_OPEN, 2.6); burst(0, 2, -207.6, 50, ['#ffde3a', '#14F195', '#ffffff'], 6); }
-      else if (doorMsgCd <= 0) { doorMsgCd = 3; toast(CFG.DOOR_LOCKED, 2.8); AU.sfx('lever'); }
+      if (p.clues >= 3) { W.door.opening = true; AU.sfx('door'); shake(0.3, 1.4); toastSay(CFG.DOOR_OPEN, 2.6); burst(0, 2, -207.6, 50, ['#ffde3a', '#14F195', '#ffffff'], 6); }
+      else if (doorMsgCd <= 0) { doorMsgCd = 5; toastSay(CFG.DOOR_LOCKED, 3); AU.sfx('lever'); }
     }
     // Teevincs
     if (playing && Math.hypot(p.pos.x - W.teevincs.x, p.pos.z - W.teevincs.z) < 2.3) startOutro();
     // boulder
     updateBoulder(dt);
-    if (playing && timeLeft < 30 && !lowWarned) { lowWarned = true; toast(CFG.LOW_TIME, 2.4); AU.setTempo(190); }
+    if (playing && TIMED && timeLeft < 30 && !lowWarned) { lowWarned = true; toast(CFG.LOW_TIME, 2.4); AU.setTempo(190); }
   }
 
   function updateBoulder(dt) {
@@ -958,7 +1067,7 @@
     else if (!B.pit) {
       B.v = Math.min(B.v + 1.6 * dt, 6.2); m.position.z -= B.v * dt; m.rotation.x -= B.v * dt / r;
       if (m.position.z < cfg.pitZ0 - 0.8) B.pit = true;
-    } else { B.vy -= 30 * dt; m.position.y += B.vy * dt; m.position.z -= B.v * 0.5 * dt; if (m.position.y < -4) { B.done = true; worldGroup.remove(m); B.mesh = null; AU.sfx('crash'); shake(0.7, 0.8); toast(CFG.CHASE_END, 2.4); AU.setTempo(172); burst(0, -0.5, cfg.pitZ0 - 1.5, 60, ['#ff5a1f', '#ffd23f', '#8a4c22'], 8, { lift: 4 }); return; } }
+    } else { B.vy -= 30 * dt; m.position.y += B.vy * dt; m.position.z -= B.v * 0.5 * dt; if (m.position.y < -4) { B.done = true; worldGroup.remove(m); B.mesh = null; AU.sfx('crash'); shake(0.7, 0.8); toastSay(CFG.CHASE_END, 2.4); AU.setTempo(172); burst(0, -0.5, cfg.pitZ0 - 1.5, 60, ['#ff5a1f', '#ffd23f', '#8a4c22'], 8, { lift: 4 }); return; } }
     rumbleT -= dt; if (rumbleT <= 0) { rumbleT = 0.42; AU.sfx('rumble'); }
     if (!B.falling) shake(0.06, 0.05);
     // smash hurdles
@@ -982,9 +1091,9 @@
       if (keys.camR) { cam.yaw -= dt * 2.2; cam.lastManual = G.t; }
       if (held.shoot && P.target && P.target.alive && G.t - cam.lastManual > 0.6) cam.yaw = lerpAngle(cam.yaw, P.facing + Math.PI, Math.min(1, dt * 3));
       // auto-follow behind the player while running forward-ish
-      if (G.t - cam.lastManual > 1.4 && P.speed > 2 && P.st === 'move') {
+      if (G.t - cam.lastManual > 0.7 && P.speed > 1.5 && (P.st === 'move' || P.st === 'mantle')) {
         const behind = P.facing + Math.PI, d = Math.abs(angDiff(cam.yaw, behind));
-        if (d < 2.2) cam.yaw = lerpAngle(cam.yaw, behind, Math.min(1, dt * 1.3));
+        if (d < 2.4) cam.yaw = lerpAngle(cam.yaw, behind, Math.min(1, dt * 2.4));
       }
       if (P.st === 'hang' || P.st === 'climb') cam.pitch += (0.15 - cam.pitch) * Math.min(1, dt * 2);
       cam.dist += (5.2 - cam.dist) * Math.min(1, dt * 3);
@@ -1047,6 +1156,7 @@
       reticle.visible = !!tg;
       if (tg) { reticle.position.set(tg.pos.x, tg.pos.y + (tg.type === 'goblin' ? 0.8 : 0), tg.pos.z); reticle.lookAt(camera.position); reticle.rotation.z = G.t * 2; reticle.material.color.set(held.shoot ? 0xff3b5c : 0xffde3a); }
     }
+    updateGuide();
     // Teevincs
     teev.root.rotation.y = 0;
     MD.animateTeevincs(teev, teev.pose, G.t, dt);
@@ -1071,7 +1181,7 @@
       updatePlayer(dt, inp);
       if (state === 'play') { updateEnemies(dt); updateBolts(dt); updateWorld(dt); }
       if (state === 'play' && P.pos.y < W.killY) pitFall();
-      if (state === 'play' && timeLeft <= 0) gameOver('time');
+      if (state === 'play' && TIMED && timeLeft <= 0) gameOver('time');
     } else if (state === 'outro' || state === 'results') {
       outroT += dt; P.animT += dt;
       const tz = W.teevincs.z + 1.8, tx = W.teevincs.x;
@@ -1172,6 +1282,8 @@
       if (state === 'intro') { introLines = null; DLG.done = null; DLG.active = false; beginPlay(); }
       else if (state === 'outro') { DLG.active = false; DLG.done = null; DLG.el.className = ''; showResults(); }
     };
+    AU.loadVoices().then(() => AU.preloadVoices(CFG.INTRO.map(l => [l.who || 'narrator', l.text])
+      .concat((CFG.INTRO_RANDOM || []).map(t => ['aaliyah', t])).concat(CFG.OUTRO.map(l => [l.who || 'narrator', l.text]))));
     requestAnimationFrame(frame);
     // test/debug hook: deterministic simulation without rendering
     const sim = (k, n, press) => {
@@ -1183,7 +1295,7 @@
       }
       for (const key in keys) keys[key] = false;
     };
-    window.__aaliyah = { get state() { return state; }, get P() { return P; }, get W() { return W; }, get enemies() { return enemies; }, cam, startRun, sim };
+    window.__aaliyah = { get objective() { return objectives.find(q => !q.done()); }, guideTarget, get state() { return state; }, get P() { return P; }, get W() { return W; }, get enemies() { return enemies; }, cam, startRun, sim };
   }
   boot();
 })();

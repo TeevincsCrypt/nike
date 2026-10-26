@@ -203,7 +203,7 @@
     const flip2 = chance(0.5) ? -1 : 1;
     B(flip2 * -6, flip2 * -2, 0, 2, -40, -44);            // step block (grab + pull up)
     B(-7, 7, 0, 4, -46, -56);                             // upper terrace
-    B(flip2 * 3, flip2 * 7, 0, 4, -45.5, -46, { climb: true }); // vine wall (alt route)
+    B(-7, 7, 0, 4, -45.5, -46, { climb: true });               // vine-covered front: climb it anywhere
     W.clues.push({ x: flip2 * -5.6, y: 4.9, z: -54.5 });
     B(flip2 * -4.5, flip2 * -3.5, 4, 5.4, -53, -56);      // little pillar near clue
     coinLine(flip2 * -4, 2.8, -40.5, flip2 * -4, 2.8, -43.5, 3);
@@ -276,14 +276,14 @@
     B(-10, -1.5, -2, 6, -124, -125); B(1.5, 10, -2, 6, -124, -125);
     W.gate1 = B(-1.5, 1.5, 0, 5, -124.2, -124.8, { kind: 'gate', mat: barsM, tile: 1.5 });
     W.gate1.y0 = 0;
-    B(m4 * 9, m4 * 5, 0, 3, -108, -118);                   // lever ledge
+    B(m4 * 9, m4 * 5, 0, 2.4, -108, -118);                 // lever ledge
     B(m4 * 5, m4 * 3.5, 0, 1.5, -111.5, -114);             // step
     W.levers.push({ x: m4 * -7, y: 0, z: -105, rotY: 0 });
-    W.levers.push({ x: m4 * 7, y: 3, z: -110, rotY: 0 });
-    W.clues.push({ x: m4 * 7.4, y: 3.9, z: -116.5 });
+    W.levers.push({ x: m4 * 7, y: 2.4, z: -110, rotY: 0 });
+    W.clues.push({ x: m4 * 7.4, y: 3.3, z: -116.5 });
     coinLine(m4 * -6, 0.8, -100, m4 * 6, 0.8, -100, 7);
     coinLine(m4 * 4.2, 2.3, -112.2, m4 * 4.2, 2.3, -113.4, 2);
-    coinLine(m4 * 6, 3.8, -111.5, m4 * 6, 3.8, -115, 3);
+    coinLine(m4 * 6, 3.2, -111.5, m4 * 6, 3.2, -115, 3);
     W.enemySpawns.push({ type: 'goblin', x: m4 * -4, y: 0, z: -114 });
     W.enemySpawns.push({ type: 'goblin', x: m4 * 2, y: 0, z: -119 });
     if (chance(0.6)) W.enemySpawns.push({ type: 'bat', x: 0, y: 4, z: -108 });
@@ -300,14 +300,15 @@
     const zig = chance(0.5) ? 1 : -1;
     const clueSide = chance(0.5) ? 1 : -1;
     for (let i = 0; i < 6; i++) {
-      const z = -129.5 - i * 2.2, x = (i % 2 ? 1 : -1) * zig * rand(0.6, 1.3);
+      const z = -129.5 - i * 2.2, x = (i % 2 ? 1 : -1) * zig * rand(0.3, 0.6);
       const s = B(x - 0.8, x + 0.8, -0.5, 0, z + 0.8, z - 0.8, { kind: 'tile', tile: 1.6 });
       s.home = { x, z }; s.state = 0; s.t = 0; s.y0min = s.min.y; s.y0max = s.max.y;
       W.tiles.push(s);
-      if (i % 2 === 0) W.coins.push({ x, y: 0.9, z });
+      if (i === 0 || i === 5) W.coins.push({ x, y: 0.9, z });
     }
-    B(clueSide * 7, clueSide * 4.6, -2, 0, -133, -137);
-    W.clues.push({ x: clueSide * 5.8, y: 0.9, z: -135 });
+    // clue #3 floats right above one of the middle tiles: grab it while crossing
+    const ct = W.tiles[clueSide > 0 ? 2 : 3];
+    W.clues.push({ x: ct.home.x, y: 1.0, z: ct.home.z });
     B(-7, 7, -2, 0, -142.4, -159);
     checkpoint(5, -143.5);
     // push block puzzle
