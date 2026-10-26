@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1b0b3a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Aaliyah the Raider</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@500;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- top bar buttons -->
+  <div id="topbar">
+    <button id="btn-mute" aria-label="Mute">🔊</button>
+    <button id="btn-pause" aria-label="Pause">⏸</button>
+  </div>
+  <button id="skip">SKIP ▶▶</button>
+
+  <div id="toast"></div>
+  <div id="slam"></div>
+
+  <!-- dialogue box -->
+  <div id="dialogue">
+    <div id="dlg-portrait-wrap"><img id="dlg-portrait" alt=""></div>
+    <div class="dlg-body">
+      <div id="dlg-name"></div>
+      <div id="dlg-text"></div>
+      <div class="dlg-hint">TAP ▶</div>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-left">
+      <div id="hud-hearts"></div>
+      <div class="hud-row"><span class="sol-icon"></span><b id="hud-sol">0</b><span class="clue-icon">?</span><b id="hud-clues">0/3</b></div>
+    </div>
+    <div id="hud-timer-box"><span>🎂 BDAY IN</span> <b id="hud-timer">4:00</b><div class="prog"><div id="hud-prog"></div></div></div>
+  </div>
+
+  <!-- touch controls -->
+  <div id="joy"><div id="joy-knob"></div></div>
+  <div id="touch">
+    <div class="btn shoot" data-btn="shoot">SHOOT</div>
+    <div class="btn jump" data-btn="jump">JUMP</div>
+    <div class="btn action" id="btn-action" data-btn="action">ACT</div>
+  </div>
+
+  <!-- title -->
+  <div id="title" class="overlay show">
+    <div class="card title-card">
+      <div class="portrait-ring"><img id="title-portrait" alt="Aaliyah"></div>
+      <div class="title-text">
+        <h1 id="title-h1">AALIYAH<span>THE RAIDER</span></h1>
+        <p id="title-tag" class="tag"></p>
+        <button id="btn-start" class="big">▶ START THE RAID</button>
+        <button id="btn-quick" class="small">skip intro</button>
+        <div class="help">
+          <div class="kb"><b>Keys:</b> WASD move · mouse look (click canvas) · Space jump · J / click shoot · F action · Shift walk · Q/E turn camera · P pause</div>
+          <div class="tc"><b>Touch:</b> left thumb moves · right thumb looks · JUMP / SHOOT / ACT buttons</div>
+          <div><b>Raider moves:</b> jump at high ledges to GRAB, jump again to pull up · climb vine walls</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="gameover" class="overlay">
+    <div class="card">
+      <h2 id="go-title">RUGGED.</h2>
+      <p id="go-quip"></p>
+      <p id="go-stats" class="dim"></p>
+      <button id="btn-retry" class="big">↻ RUN IT BACK</button>
+    </div>
+  </div>
+
+  <div id="results" class="overlay">
+    <div class="card">
+      <h2 id="res-title">TIP DELIVERED!</h2>
+      <div class="rank"><div id="res-rank"></div><p id="res-desc"></p></div>
+      <div id="res-stats"></div>
+      <button id="btn-again" class="big">↻ RAID AGAIN</button>
+    </div>
+  </div>
+
+  <div id="pause" class="overlay">
+    <div class="card">
+      <h2>PAUSED</h2>
+      <p class="dim">Aaliyah is hydrating.</p>
+      <button id="btn-resume" class="big">▶ RESUME</button>
+      <button id="btn-restart" class="small">↻ restart level</button>
+      <button id="btn-mute2" class="small">SOUND: ON</button>
+    </div>
+  </div>
+
+  <div id="rotate">↻ rotate your phone for maximum chaos</div>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/GLTFLoader.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/level.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
