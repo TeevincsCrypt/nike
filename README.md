@@ -1,95 +1,51 @@
-# AALIYAH THE RAIDER
+# AALIYAH: INTO THE TRENCHES
 
-A short, chaotic, Tomb Raider-style **3D third-person** action-adventure. Aaliyah raids an ancient Solana tomb to find Teevincs before his birthday and tip him SOL.
+A dark, pixel-art 2D side-scrolling brawler. Teevincs is down bad in the Solana trenches: his wallet is empty and a launch is about to go live. Aaliyah fights through the trenches to bring him the SOL so he can trench.
 
-One run takes about 2–3 minutes. Each run is a little different: enemy spots, coin lines, trap timings, which side the ledges and clues are on, and the crumbling-bridge layout all change.
+A run is about 3 minutes of combat plus voiced cutscenes:
+
+1. **The Trenches.** Jeeters (paper-hands grunts) and Rug Pullers, who steal SOL from your bag and run.
+2. **The Bundler Bunker.** MEV sandwich bots that shoot from above, Bundlers behind coin shields, and electrified floors.
+3. **The Liquidity Pool.** Boss fight against **The Dev**: dash attacks, red-candle rain, ground-slam shockwaves, and summons in phase 2.
+4. **Trench HQ.** Hand Teevincs the bag, watch him snipe the launch, and get your rank (Trench General → Exit Liquidity).
+
+Aaliyah never dies. When she's beaten down she drops part of her SOL bag, which you can pick back up, and gets back up.
 
 ## Play
 
-It's a static web app with no build step. Three.js is vendored in `/vendor`, so it works offline.
+It's a static site with no build step, so any static host works (Vercel, Netlify, GitHub Pages).
 
 ```bash
-python3 -m http.server 8000     # or any static file server
-# open http://localhost:8000
+python3 -m http.server 8000   # then open http://localhost:8000
 ```
-
-To put it online, upload the folder as is to any static host (GitHub Pages, Netlify, Vercel or itch.io).
 
 ### Controls
 
-| Action | Keyboard / mouse | Touch |
+| | Keyboard | Phone |
 |---|---|---|
-| Move | WASD / arrow keys (Shift = walk) | left thumb (floating joystick) |
-| Camera | click the game, then move the mouse · Q / E | drag with the right thumb |
-| Jump / grab ledge / pull up | Space | JUMP |
-| SOL pistols (auto lock-on, homing shots) | J or left click | SHOOT (hold) |
-| Pull lever / let go of ledge | F | ACT (lights up when something is in reach) |
+| Move / crouch | A D / ← → · S ↓ | ◀ ▶ · ▼ |
+| Jump | W / Space / ↑ | JUMP |
+| Strike (tap for a 3-hit combo, in the air for a dive kick) | J / X | STRIKE |
+| Block (just before a hit = **parry**: stuns enemies and reflects shots) | K / C / Shift | BLOCK |
+| SOL Blast (when the meter is full; breaks shields) | L / V | BLAST |
 | Pause · Mute | P / Esc · M | top-right buttons |
-
-**Raider moves:** jump at a high ledge to **grab** it, then press jump (or keep pushing forward) to **pull up**. You can shimmy left and right while hanging. Walking into waist-high blocks vaults them. Vine walls can be climbed.
-
-## The run
-
-1. **Courtyard.** Jump the lava gap, vault, and blast the FUD goblins.
-2. **Climb Hall.** Ledge grabs, pull-ups and a vine wall. Clue #1 is on the terrace.
-3. **Trap Hall.** Timed spikes, swinging blades, dart walls and RUG bats.
-4. **Lever Room.** Pull 2 levers to open the gate. Clue #2 is on the lever ledge.
-5. **Lava Bridge.** Crumbling tiles. Clue #3 is on a side platform. Push the block onto the plate.
-6. **Boulder Run.** A giant FUD boulder chases you. Run.
-7. **Birthday Chamber.** The 3-clue door, Teevincs, cake, and the SOL tip explosion.
-
-In easy mode (the default) you can't fail: just follow the waypoint to Teevincs.
 
 ## Customize
 
-### Dialogue, names, timer and ranks: `js/config.js`
-Every line of the intro and outro is plain text in `INTRO` / `OUTRO`. Each line can add:
-- `shake: true` to shake the screen,
-- `slam: "BIG TEXT"` to slam giant text across the screen,
-- `event: "tip"` to trigger the SOL explosion and the birthday music,
-- the placeholders `{sol}`, `{clues}`, `{time}` and `{left}`.
-
-The same file holds the hints, clue texts, game-over quips, the end-screen ranks, `TIME_LIMIT` and `START_HEARTS`.
-
-### Easy mode (on by default): `ASSIST` in `js/config.js`
-Aaliyah **can't die**. Hits only knock her back, and falling in lava puts her straight back on safe ground. There's no timer fail either: the clock just counts your run time. Just push the stick toward the golden **▼ waypoint** (it shows the distance to the next objective):
-- she **jumps gaps and spikes** by herself (`autoJump`),
-- **climbs ledges and vine walls** just by running into them (`autoClimb`),
-- **shoots** nearby enemies by herself with homing shots (`autoShoot`),
-- **pulls levers** just by walking up to them (`autoLever`).
-
-Set any of these to `false` for a harder, more manual game. Set `TIME_LIMIT` to a number of seconds to bring back the birthday countdown.
-
-### Voiceover: `assets/voice/` + `tools/make_voices.py`
-Every intro and outro line, hint, clue and in-game shout is pre-recorded: Aaliyah, Teevincs and a narrator each have their own voice. The recordings are generated from the text in `js/config.js` with the free Kokoro voice model. If you edit a line, re-run the script to re-record it (setup instructions are at the top of `tools/make_voices.py`). Until you do, the edited line falls back to the device's speech voice. Cutscene lines move on by themselves when the voice finishes (`VOICE.autoAdvance`).
-
-### Touch feel
-`TOUCH.stickSensitivity` and `TOUCH.lookSensitivity` tune the joystick and the camera drag. Lower numbers are calmer.
-
-### Aaliyah's look
-- **Portrait** (dialogue box and title): `PORTRAITS.aaliyah`, currently `assets/aaliyah.jpg`.
-- **3D model**: by default she's a built-in low-poly model (cowboy hat, horns, cow ears, long blonde hair, cow-print outfit, sleeves and boots, gold bell, tail, SOL pistols). To use your own model, put a `.glb` file in `/assets` and set:
-  ```js
-  MODEL: { aaliyah: "assets/aaliyah.glb", aaliyahScale: 1, aaliyahYaw: 0 }
-  ```
-  The model is auto-scaled to about 1.7 m. Animation clips named `idle`, `run`, `jump`, `fall`, `hang`, `climb`, `shoot`, `hurt` and `celebrate` are picked up automatically. Teevincs can be swapped the same way (`MODEL.teevincs`, `PORTRAITS.teevincs`).
-
-### Level: `js/level.js`
-The tomb is built from simple boxes: `B(x0, x1, y0, y1, z0, z1, opts)`. Each section is commented, so you can move platforms, add coins (`coinLine`, `coinArc`), enemies (`enemySpawns`) or traps.
+- **Story, dialogue, difficulty, ranks:** `js/config.js`
+- **Level layout, enemy waves, pits, platforms, hazards:** `js/level.js`
+- **Aaliyah's sprites:** sliced from `assets/src/aaliyah_sheet.jpg` by `python3 tools/slice_sprites.py`, which writes `assets/aaliyah_sprites.png`, `assets/aaliyah_sprites.json` and `assets/shield_fx.png`. For a new sheet with the same layout (IDLE / WALK / RUN / JUMP / CROUCH / BLOCK / HIT), replace the JPG and re-run the script.
+- **Voiceover:** every cutscene line, zone title, hint and combat shout is pre-recorded in `assets/voice/`. After you edit a line, re-record it with `tools/make_voices.py` (setup is at the top of that file). Until you do, the edited line falls back to the device's speech voice.
 
 ## Files
 
 ```
-index.html        UI shell (HUD, dialogue, overlays, touch controls)
-css/style.css     styling
-js/config.js      ← all editable text and settings
-js/audio.js       WebAudio chiptune music + SFX (no audio files)
-js/models.js      procedural 3D Aaliyah, Teevincs, goblins, bats, coins
-js/level.js       tomb geometry, traps, puzzles
-js/game.js        physics, ledge grabs, combat, camera, cinematics
-vendor/           three.js r147 (MIT)
+index.html  css/style.css    UI shell (HUD, dialogue, touch controls, overlays)
+js/config.js                 ← story, dialogue, voice, difficulty, ranks
+js/level.js                  ← zones, waves, pits, platforms, hazards
+js/game.js                   engine: physics, combat, enemy AI, boss, cutscenes, rendering
+js/art.js                    pixel art: enemies, the Dev, Teevincs, backgrounds, props
+js/audio.js                  WebAudio: dark trap/synth music, SFX, voiceover playback
+assets/                      Aaliyah sprites, portrait, voice lines
+tools/                       sprite slicer + voice recorder
 ```
-
-## Performance
-
-There are no real-time shadows on phones (a blob shadow is used instead), the pixel ratio is capped at 1.5, and coins and spikes use instanced meshes. On older phones, set `MAX_DPR: 1` in the config.

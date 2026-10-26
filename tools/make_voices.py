@@ -21,9 +21,10 @@ OUT = os.path.join(ROOT, "assets", "voice")
 
 # character -> (kokoro voice, speed, pitch factor)
 CAST = {
-    "aaliyah": ("af_bella", 1.1, 1.06),
-    "teevincs": ("am_puck", 1.0, 1.0),
-    "narrator": ("bm_george", 0.92, 0.97),
+    "aaliyah": ("af_heart", 1.0, 1.0),
+    "teevincs": ("am_michael", 1.05, 1.0),
+    "narrator": ("am_onyx", 0.88, 0.96),
+    "dev": ("am_fenrir", 0.95, 0.9),
 }
 
 
@@ -34,18 +35,17 @@ def load_config():
 
 def collect(cfg):
     lines = []
-    for ln in cfg.get("INTRO", []) + cfg.get("OUTRO", []):
-        lines.append((ln.get("who", "narrator"), ln["text"]))
-    for t in cfg.get("INTRO_RANDOM", []):
-        lines.append(("aaliyah", t))
-    for group in (cfg.get("BARKS") or {}).values():
-        lines += [("aaliyah", t) for t in group]
-    for key in ("CLUES", "CHECKPOINT", "PIT"):
-        lines += [("aaliyah", t) for t in cfg.get(key, [])]
-    for key in ("ALL_CLUES", "DOOR_LOCKED", "DOOR_OPEN", "CHASE_START", "CHASE_END", "PLATE", "GATE_OPEN"):
+    for key in ("INTRO", "BOSS_INTRO", "BOSS_DEFEAT", "OUTRO"):
+        for ln in cfg.get(key, []):
+            lines.append((ln.get("who", "narrator"), ln["text"]))
+    lines += [("narrator", t) for t in (cfg.get("ZONES") or {}).values()]
+    lines += [("aaliyah", t) for t in (cfg.get("HINTS") or {}).values()]
+    for key in ("WAVE_START", "WAVE_CLEAR"):
         if cfg.get(key):
             lines.append(("aaliyah", cfg[key]))
-    lines += [("aaliyah", t) for t in (cfg.get("HINTS") or {}).values()]
+    lines += [("aaliyah", t) for t in cfg.get("KNOCKDOWN", [])]
+    for group in (cfg.get("BARKS") or {}).values():
+        lines += [("aaliyah", t) for t in group]
     seen, out = set(), []
     for who, t in lines:
         if (who, t) not in seen:
@@ -54,14 +54,15 @@ def collect(cfg):
 
 
 def speakable(text):
-    t = re.sub(r"\(?\{[a-z]+\}(/\d+)?\)?", "", text)          # drop {placeholders}
+    t = re.sub(r"\{sol\}\s*SOL[.,]?", "", text)                  # "{sol} SOL." is read out by the HUD, not the voice
+    t = re.sub(r"\(?\{[a-z]+\}(/\d+)?\)?", "", t)             # drop other {placeholders}
     t = t.replace("—", ",").replace("...", ", ").replace("CLUE:", "Clue!")
     t = re.sub(r"\b(\d)\s*,\s*(\d)\b", r"\1, \2", t)
     t = re.sub(r"([A-Za-z])\1{3,}", r"\1\1\1", t)               # GOOOOOO -> GOOO
     t = re.sub(r"\b[A-Z]{2,}(?:'[A-Z]+)?\b", lambda m: m.group(0).lower(), t)     # SHOUTING -> shouting (else it's spelled out)
     reps = {r"\bteevincs\b": "Teevinks", r"\bTeevincs\b": "Teevinks", r"\bsol\b": "Sol", r"\bSOL\b": "Sol",
             r"\bfud\b": "fudd", r"\bFUD\b": "fudd", r"\bbday\b": "birthday", r"\bgm\b": "G M", r"\blol\b": "L O L",
-            r"\bsolana\b": "Solana", r"\bnft\b": "N F T"}
+            r"\bsolana\b": "Solana", r"\bnft\b": "N F T", r"\bMEV\b": "M E V", r"\bmev\b": "M E V", r"\$TRENCH": "trench", r"\bhq\b": "H Q"}
     for a, b in reps.items():
         t = re.sub(a, b, t, flags=0)
     t = re.sub(r"!{2,}", "!", t); t = re.sub(r"\?{2,}", "?", t); t = re.sub(r"\s+", " ", t).strip(" ,")

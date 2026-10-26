@@ -179,28 +179,32 @@
 
   /* ------------------------------ SFX ------------------------------- */
   const SFX = {
-    jump: t => tone('square', 320, t, 0.13, 0.18, null, 720),
-    coin: t => { tone('square', 988, t, 0.06, 0.13); tone('square', 1480, t + 0.055, 0.14, 0.13); },
-    clue: t => [72, 76, 79, 84, 88].forEach((m, i) => tone('triangle', mtof(m), t + i * 0.07, 0.2, 0.25)),
-    heart: t => [67, 72, 76].forEach((m, i) => tone('square', mtof(m), t + i * 0.06, 0.12, 0.12)),
-    hit: t => { noise(t, 0.18, 0.5, null, 'lowpass', 3000, 300); tone('square', 260, t, 0.25, 0.2, null, 70); },
-    whip: t => { noise(t, 0.12, 0.35, null, 'bandpass', 800, 5000); tone('sawtooth', 900, t + 0.06, 0.05, 0.08, null, 1800); },
-    stomp: t => { tone('square', 420, t, 0.14, 0.22, null, 90); noise(t, 0.08, 0.3, null, 'lowpass', 1500); },
-    boing: t => tone('triangle', 180, t, 0.35, 0.35, null, 1100),
-    death: t => { tone('square', 700, t, 0.7, 0.22, null, 50); noise(t, 0.4, 0.2, null, 'lowpass', 2000, 100); },
-    door: t => { noise(t, 1.4, 0.5, null, 'lowpass', 400, 60); tone('sine', 70, t, 1.2, 0.4, null, 40); },
-    gate: t => { noise(t, 0.6, 0.4, null, 'lowpass', 600, 80); tone('square', 110, t, 0.3, 0.1, null, 55); },
-    lever: t => { tone('square', 1300, t, 0.04, 0.15); tone('square', 700, t + 0.05, 0.06, 0.15); },
-    checkpoint: t => [69, 73, 76, 81].forEach((m, i) => tone('triangle', mtof(m), t + i * 0.05, 0.18, 0.2)),
-    rumble: t => noise(t, 0.6, 0.35, null, 'lowpass', 160, 60),
-    crash: t => { noise(t, 1.0, 0.7, null, 'lowpass', 1200, 50); tone('sine', 90, t, 0.8, 0.5, null, 30); },
-    slam: t => { tone('sine', 140, t, 0.5, 0.6, null, 35); noise(t, 0.25, 0.4, null, 'lowpass', 2500, 200); },
-    fanfare: t => {
-      [[60, 64, 67], [65, 69, 72], [67, 71, 74], [72, 76, 79, 84]].forEach((ch, i) =>
-        ch.forEach(m => tone('square', mtof(m), t + i * 0.14, i === 3 ? 0.6 : 0.13, 0.08)));
-    },
-    tip: t => { for (let i = 0; i < 8; i++) tone('square', mtof(84 + (i % 4) * 3), t + i * 0.04, 0.06, 0.07); },
-    pause: t => tone('triangle', 600, t, 0.08, 0.15, null, 300)
+    jump: t => { noise(t, 0.08, 0.25, null, 'bandpass', 900, 2400); tone('triangle', 180, t, 0.1, 0.12, null, 320); },
+    land: t => noise(t, 0.08, 0.3, null, 'lowpass', 600, 120),
+    swing: t => noise(t, 0.13, 0.32, null, 'bandpass', 600, 3200),
+    swingHeavy: t => { noise(t, 0.2, 0.42, null, 'bandpass', 300, 2600); tone('sawtooth', 120, t, 0.18, 0.08, null, 60); },
+    hit: t => { noise(t, 0.12, 0.6, null, 'lowpass', 2400, 200); tone('sine', 130, t, 0.14, 0.6, null, 45); },
+    hitHeavy: t => { noise(t, 0.25, 0.8, null, 'lowpass', 3000, 90); tone('sine', 90, t, 0.3, 0.8, null, 30); tone('square', 70, t, 0.12, 0.12, null, 40); },
+    hurt: t => { noise(t, 0.18, 0.55, null, 'lowpass', 1800, 150); tone('sine', 160, t, 0.2, 0.5, null, 60); },
+    block: t => { tone('square', 1400, t, 0.05, 0.12); tone('triangle', 900, t, 0.25, 0.18, null, 600); noise(t, 0.06, 0.3, null, 'highpass', 4000); },
+    parry: t => { [1320, 1980, 2640].forEach((f, i) => tone('triangle', f, t + i * 0.025, 0.35, 0.14)); noise(t, 0.1, 0.25, null, 'highpass', 5000); },
+    clang: t => { tone('square', 620, t, 0.18, 0.12, null, 540); tone('square', 930, t, 0.12, 0.08); noise(t, 0.08, 0.3, null, 'bandpass', 3000); },
+    blast: t => { tone('sawtooth', 90, t, 0.6, 0.35, null, 40); noise(t, 0.5, 0.5, null, 'lowpass', 4000, 200); tone('sine', 400, t, 0.4, 0.3, null, 1400); },
+    coin: t => { tone('square', 1568, t, 0.05, 0.07); tone('square', 2093, t + 0.045, 0.1, 0.07); },
+    steal: t => { [700, 520, 380].forEach((f, i) => tone('square', f, t + i * 0.07, 0.08, 0.1)); },
+    shoot: t => { tone('sawtooth', 1800, t, 0.12, 0.1, null, 500); noise(t, 0.06, 0.15, null, 'highpass', 3000); },
+    zap: t => { for (let i = 0; i < 5; i++) noise(t + i * 0.03, 0.03, 0.3, null, 'bandpass', 4000 + Math.random() * 3000); tone('square', 60, t, 0.2, 0.15); },
+    knockdown: t => { noise(t, 0.5, 0.7, null, 'lowpass', 900, 60); tone('sine', 70, t, 0.6, 0.7, null, 28); },
+    getup: t => { [220, 330, 440].forEach((f, i) => tone('triangle', f, t + i * 0.06, 0.15, 0.12)); },
+    enemyDie: t => { noise(t, 0.35, 0.5, null, 'lowpass', 1500, 80); tone('sine', 110, t, 0.3, 0.4, null, 35); },
+    boom: t => { tone('sine', 60, t, 1.4, 0.9, null, 25); noise(t, 1.0, 0.6, null, 'lowpass', 800, 40); },
+    candle: t => { tone('sawtooth', 300, t, 0.4, 0.1, null, 80); },
+    slam: t => { tone('sine', 55, t, 0.8, 0.9, null, 22); noise(t, 0.6, 0.7, null, 'lowpass', 700, 50); },
+    dash: t => noise(t, 0.35, 0.45, null, 'bandpass', 400, 2000),
+    send: t => { for (let i = 0; i < 10; i++) tone('square', 880 + i * 110, t + i * 0.04, 0.06, 0.05); },
+    alarm: t => { tone('square', 660, t, 0.18, 0.08); tone('square', 440, t + 0.2, 0.18, 0.08); },
+    pause: t => tone('triangle', 500, t, 0.08, 0.15, null, 250),
+    clear: t => { [392, 523, 659, 784].forEach((f, i) => tone('triangle', f, t + i * 0.07, 0.25, 0.12)); }
   };
   A.sfx = function (name) {
     if (!A.ctx || A.muted || !SFX[name]) return;
@@ -216,67 +220,68 @@
   };
 
   /* ----------------------------- MUSIC ------------------------------ */
-  function kick(t) { tone('sine', 150, t, 0.16, 0.9, musicBus, 40); }
-  function snare(t) { noise(t, 0.12, 0.45, musicBus, 'highpass', 1500); tone('triangle', 220, t, 0.06, 0.25, musicBus, 120); }
-  function hat(t, v) { noise(t, 0.035, v || 0.18, musicBus, 'highpass', 7000); }
-
-  // A harmonic minor tomb-rave. Chords: Am F G E
-  const RAID_ROOTS = [45, 41, 43, 40];
-  const RAID_CHORDS = [[0, 3, 7], [0, 4, 7], [0, 4, 7], [0, 4, 7]];
-  const ARP = [0, 1, 2, 3, 2, 1, 2, 0, 1, 2, 3, 2, 3, 1, 2, 1];
-  const HOOK = [81, 0, 84, 0, 88, 86, 84, 0, 83, 0, 80, 0, 81, 0, 0, 0,
-                77, 0, 81, 0, 84, 83, 81, 0, 79, 0, 83, 0, 86, 0, 84, 83];
-  const raid = {
+  // Dark trap / synthwave. 16th-note grid.
+  function kick(t, v) { tone('sine', 140, t, 0.22, v || 0.95, musicBus, 38); }
+  function snare(t, v) { noise(t, 0.16, v || 0.5, musicBus, 'highpass', 1200); noise(t, 0.08, 0.3, musicBus, 'bandpass', 2500); }
+  function clap(t) { for (let i = 0; i < 3; i++) noise(t + i * 0.012, 0.09, 0.32, musicBus, 'bandpass', 1500); }
+  function hat(t, v) { noise(t, 0.03, v || 0.14, musicBus, 'highpass', 8000); }
+  function sub(t, f, dur, glide) { tone('sine', f, t, dur, 0.55, musicBus, glide); tone('triangle', f * 2, t, dur * 0.6, 0.08, musicBus, glide ? glide * 2 : 0); }
+  function pad(t, notes, dur, v) { notes.forEach(m => { tone('sawtooth', mtof(m), t, dur, v || 0.025, musicBus, 0, dur * 0.3); tone('sawtooth', mtof(m) * 1.006, t, dur, v || 0.025, musicBus, 0, dur * 0.3); }); }
+  function lead(t, m, dur, v) { tone('square', mtof(m), t, dur, v || 0.05, musicBus); tone('square', mtof(m) * 1.004, t, dur, (v || 0.05) * 0.6, musicBus); }
+  // C minor: Cm  Ab  Eb  Bb  (i VI III VII)
+  const PROG = [[48, [60, 63, 67]], [44, [56, 60, 63]], [51, [58, 63, 67]], [46, [58, 62, 65]]];
+  const MEL = [72, 0, 0, 70, 0, 67, 0, 0, 68, 0, 67, 0, 63, 0, 65, 0];
+  const trench = {
     div: 4,
     play(step, t, spb) {
-      const bar = Math.floor(step / 16) % 4, s = step % 16, root = RAID_ROOTS[bar], ch = RAID_CHORDS[bar];
-      const section = Math.floor(step / 64) % 2;
-      if (s % 4 === 0) kick(t);
-      if (s === 4 || s === 12) snare(t);
-      if (bar === 3 && s >= 12) snare(t);
-      if (s % 2 === 1) hat(t, 0.12); else hat(t, 0.06);
-      if (s % 2 === 0) tone('square', mtof(root + (s % 4 === 2 ? 12 : 0)), t, spb * 1.6, 0.22, musicBus);
-      const ai = ARP[s] % 4, note = root + 24 + (ai === 3 ? 12 : ch[ai]);
-      tone('triangle', mtof(note), t, spb * 0.9, 0.12, musicBus);
-      if (section === 1) {
-        const h = HOOK[(step % 64) % 32 + (bar >= 2 ? 0 : 0)];
-        if (h) tone('square', mtof(h - 12), t, spb * 1.8, 0.1, musicBus);
-      }
+      const bar = Math.floor(step / 16) % 4, s = step % 16, [root, chord] = PROG[bar], sec = Math.floor(step / 64) % 4;
+      if (s === 0 || s === 10 || (bar % 2 === 1 && s === 7)) kick(t);
+      if (s === 8) { snare(t); clap(t); }
+      const roll = (bar === 3 && s >= 12);
+      if (roll) hat(t, 0.1), hat(t + spb / 2, 0.08); else if (s % 2 === 0) hat(t, s % 4 === 0 ? 0.13 : 0.08);
+      if (s === 0) sub(t, mtof(root - 12), spb * 7);
+      if (s === 10) sub(t, mtof(root - 12), spb * 5, bar === 3 ? mtof(root - 14) : 0);
+      if (s === 0) pad(t, chord, spb * 16, 0.02);
+      if (sec >= 1 && MEL[s]) lead(t, MEL[s] - (bar === 1 ? 4 : 0), spb * 1.8, 0.035);
+      if (sec >= 2 && s % 4 === 2) tone('triangle', mtof(chord[(s / 4 | 0) % 3] + 12), t, spb, 0.05, musicBus);
+    }
+  };
+  const boss = {
+    div: 4,
+    play(step, t, spb) {
+      const bar = Math.floor(step / 16) % 4, s = step % 16, root = [48, 49, 48, 46][bar];
+      if (s % 4 === 0 || s === 14) kick(t);
+      if (s === 4 || s === 12) { snare(t, 0.6); clap(t); }
+      hat(t, s % 2 ? 0.07 : 0.13);
+      if (s % 2 === 0) tone('sawtooth', mtof(root - 12 + (s % 8 === 6 ? 12 : 0)), t, spb * 1.6, 0.11, musicBus);
+      if (s === 0) sub(t, mtof(root - 24), spb * 15);
+      if (s % 4 === 0) tone('square', mtof(root + 24 + [0, 3, 7, 10][(s / 4) | 0]), t, spb * 0.8, 0.035, musicBus);
+      if (s === 0 && bar === 0) pad(t, [root + 12, root + 15, root + 18], spb * 32, 0.02);
     }
   };
   const intro = {
     div: 4,
     play(step, t, spb) {
-      const s = step % 16, bar = Math.floor(step / 16) % 2;
-      if (s % 4 === 0) kick(t);
-      if (s % 2 === 1) hat(t, 0.1);
-      if (s === 12 || (bar === 1 && s > 11)) snare(t);
-      if (s % 2 === 0) tone('square', mtof((bar ? 41 : 45) + (s % 4 ? 12 : 0)), t, spb * 1.5, 0.2, musicBus);
+      const s = step % 32;
+      if (s === 0) { sub(t, mtof(36), spb * 30); pad(t, [60, 63, 67, 70], spb * 32, 0.02); }
+      if (s === 0 || s === 20) kick(t, 0.8);
+      if (s === 16) snare(t, 0.35);
+      if (s % 4 === 2) hat(t, 0.05);
     }
   };
-  // Happy Birthday (public domain), chiptune speedrun edition. 3/4 time, 8th-note grid.
-  const HB = [[67, 1], [67, 1], [69, 2], [67, 2], [72, 2], [71, 4],
-              [67, 1], [67, 1], [69, 2], [67, 2], [74, 2], [72, 4],
-              [67, 1], [67, 1], [79, 2], [76, 2], [72, 2], [71, 2], [69, 4],
-              [77, 1], [77, 1], [76, 2], [72, 2], [74, 2], [72, 4], [0, 2]];
-  const HB_STEPS = []; HB.forEach(([m, d]) => { HB_STEPS.push([m, d]); for (let i = 1; i < d; i++) HB_STEPS.push(null); });
-  const HB_BASS = [48, 48, 43, 43, 43, 48, 48, 53, 48, 43, 48, 48, 48];
-  const birthday = {
-    div: 2,
+  const outro = {
+    div: 4,
     play(step, t, spb) {
-      const i = step % HB_STEPS.length, n = HB_STEPS[i];
-      if (n && n[0]) {
-        tone('square', mtof(n[0]), t, spb * n[1] * 0.95, 0.16, musicBus);
-        tone('triangle', mtof(n[0] + 12), t, spb * n[1] * 0.6, 0.08, musicBus);
-      }
-      const bar = Math.floor(i / 6) % HB_BASS.length, s = i % 6;
-      if (s === 0) { kick(t); tone('square', mtof(HB_BASS[bar] - 12), t, spb * 1.6, 0.22, musicBus); }
-      else if (s % 2 === 0) { snare(t); tone('square', mtof(HB_BASS[bar] + 7), t, spb * 0.8, 0.1, musicBus); }
-      hat(t, s % 2 ? 0.08 : 0.14);
+      const bar = Math.floor(step / 16) % 4, s = step % 16, [root, chord] = [[44, [56, 60, 63]], [51, [58, 63, 67]], [46, [58, 62, 65]], [48, [60, 63, 67]]][bar];
+      if (s === 0 || s === 6 || s === 10) kick(t);
+      if (s === 8) { snare(t); clap(t); }
+      if (s % 2 === 0) hat(t, 0.1);
+      if (s === 0) { sub(t, mtof(root - 12), spb * 14); pad(t, chord.map(n => n + 12), spb * 16, 0.025); }
+      if (s % 2 === 0) tone('triangle', mtof(chord[(s / 2) % 3] + 24), t, spb * 0.9, 0.05, musicBus);
     }
   };
-  const TRACKS = { raid, intro, birthday };
-  const BPM = { raid: 172, intro: 150, birthday: 200 };
+  const TRACKS = { trench, boss, intro, outro };
+  const BPM = { trench: 140, boss: 156, intro: 90, outro: 132 };
 
   function schedule() {
     if (!A.ctx || !A.track) return;
