@@ -347,6 +347,8 @@
     if (!A.timer) A.timer = setInterval(schedule, 25);
   };
   A.setTempo = bpm => { A.bpm = bpm; };
+  // full game mix as a MediaStream (used by the gameplay-recording tool)
+  A.captureStream = function () { A.init(); if (!A.capDest) { A.capDest = A.ctx.createMediaStreamDestination(); master.connect(A.capDest); } return A.capDest.stream; };
 
   window.AALIYAH_AUDIO = A;
 })();

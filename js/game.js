@@ -910,5 +910,7 @@
     for (let i = 0; i < n; i++) { pollInput(); if (i === 0) for (const kk in k) if (k[kk] && kk.startsWith('tap_')) pressed[kk.slice(4)] = true; update(STEP); for (const kk in pressed) pressed[kk] = false; }
     for (const key in keys) keys[key] = false;
   };
-  window.__trench = { get state() { return state; }, get P() { return P; }, W, sim, startGame, skip: () => { while (DLG.active) nextLine(); } };
+  // live input (used by the gameplay-recording tool): plain keys are held, "tap_x" presses once
+  const setInput = k => { for (const key in keys) keys[key] = false; for (const kk in k) { if (kk.startsWith('tap_')) { if (k[kk]) pressed[kk.slice(4)] = true; } else keys[kk] = !!k[kk]; } };
+  window.__trench = { get state() { return state; }, get P() { return P; }, W, sim, setInput, startGame, skip: () => { while (DLG.active) nextLine(); } };
 })();
