@@ -35,6 +35,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
 - **Story, dialogue, difficulty, ranks:** `js/config.js`
 - **Level layout, enemy waves, pits, platforms, hazards:** `js/level.js`
 - **Aaliyah's sprites:** sliced from `assets/src/aaliyah_sheet.jpg` by `python3 tools/slice_sprites.py`, which writes `assets/aaliyah_sprites.png`, `assets/aaliyah_sprites.json` and `assets/shield_fx.png`. For a new sheet with the same layout (IDLE / WALK / RUN / JUMP / CROUCH / BLOCK / HIT), replace the JPG and re-run the script.
+- **Gameplay music:** `assets/music/bgm.mp3` loops during all fighting, including the boss. It fades out for cutscenes and resumes where it left off. To use a different song, swap the file or change `MUSIC` in `js/config.js`.
 - **Voiceover:** every cutscene line, zone title, hint and combat shout is pre-recorded in `assets/voice/`. After you edit a line, re-record it with `tools/make_voices.py` (setup is at the top of that file). Until you do, the edited line falls back to the device's speech voice.
 
 ## Files

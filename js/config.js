@@ -25,6 +25,13 @@ window.AALIYAH_CONFIG = {
     narrator: { pitch: 0.6, rate: 0.9, voiceNames: ["Daniel", "Alex", "Male"] },
     dev:      { pitch: 0.5, rate: 0.95, voiceNames: ["Fred", "Alex", "Male"] } },
 
+  // Gameplay music: an audio file that loops while you play (fights + boss).
+  // Cutscenes use the built-in synth score. Remove a line to fall back to the synth track.
+  MUSIC: {
+    tracks: { trench: "assets/music/bgm.mp3", boss: "assets/music/bgm.mp3" },
+    volume: 1            // 0 – 1.5
+  },
+
   TOUCH: { buttonScale: 1 },
   MAX_DPR: 2,
 

@@ -31,6 +31,7 @@
       A.unlocked = true;
     }
     if (A.voiceUnlock) A.voiceUnlock();
+    if (A.ctx) A.primeMusic();
   };
 
   A.init = function () {
@@ -52,8 +53,9 @@
     try { localStorage.setItem('aaliyah_muted', m ? '1' : '0'); } catch (e) {}
     if (master) master.gain.setTargetAtTime(m ? 0 : 0.8, A.ctx.currentTime, 0.02);
     if (m) A.stopVoice();
+    if (bgm && !bgmGain) bgm.muted = m;
   };
-  A.suspend = () => { if (A.ctx && A.ctx.state === 'running') A.ctx.suspend(); A.stopVoice(); };
+  A.suspend = () => { if (A.ctx && A.ctx.state === 'running') A.ctx.suspend(); A.stopVoice(); A.bgmPause(); };
 
   /* ------------------------------ VOICE ------------------------------ */
   // Each character speaks their lines. Uses a recorded file if the line has `voice: "assets/voice/x.mp3"`,
@@ -156,7 +158,7 @@
     lastBark = now; A.say(text, who || 'aaliyah');
   };
 
-  A.resume = () => { if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume(); };
+  A.resume = () => { if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume(); A.bgmResume(); };
 
   function tone(type, f0, t, dur, vol, dest, f1, attack) {
     const o = A.ctx.createOscillator(), gn = A.ctx.createGain();
@@ -291,8 +293,54 @@
       A.step++; A.nextTime += spb;
     }
   }
+  /* ---------------------- GAMEPLAY MUSIC (audio file) ---------------------- */
+  // CONFIG.MUSIC.tracks maps a music name to a file; those play the file instead of the synth.
+  // One <audio> element routed through Web Audio, so mute, pause and voice ducking all apply.
+  const MCFG = () => (window.AALIYAH_CONFIG && window.AALIYAH_CONFIG.MUSIC) || {};
+  let bgm = null, bgmGain = null, bgmWanted = false, bgmPrimed = false, bgmStopT = null;
+  function ensureBgm(src) {
+    if (!src) return null;
+    if (!bgm) {
+      bgm = new Audio(); bgm.loop = true; bgm.preload = 'auto'; bgm.setAttribute('playsinline', ''); bgm.src = src;
+    } else if (!bgm.src.endsWith(src)) { bgm.src = src; }
+    if (A.ctx && !bgmGain) {
+      try {
+        const node = A.ctx.createMediaElementSource(bgm);
+        bgmGain = A.ctx.createGain(); bgmGain.gain.value = 0; node.connect(bgmGain); bgmGain.connect(musicBus);
+      } catch (e) { bgmGain = null; }
+    }
+    return bgm;
+  }
+  function bgmLevel() { return MCFG().volume != null ? MCFG().volume * 1.7 : 1.7; }
+  function bgmFade(to, secs) {
+    if (bgmGain) bgmGain.gain.setTargetAtTime(to, A.ctx.currentTime, secs / 3);
+    else if (bgm) bgm.volume = Math.min(1, to / 1.7) * (A.muted ? 0 : 1);
+  }
+  function bgmPlay(src) {
+    const el = ensureBgm(src); if (!el) return;
+    bgmWanted = true; if (bgmStopT) { clearTimeout(bgmStopT); bgmStopT = null; }
+    if (el.paused) { const pr = el.play(); if (pr && pr.catch) pr.catch(() => {}); }
+    bgmFade(bgmLevel(), 0.8);
+  }
+  function bgmStop() {
+    if (!bgm || !bgmWanted) return;
+    bgmWanted = false; bgmFade(0, 0.6);
+    bgmStopT = setTimeout(() => { if (!bgmWanted && bgm) bgm.pause(); }, 700);   // keeps its position, resumes there
+  }
+  // prime the element inside a user tap so iOS lets it start later from the game loop
+  A.primeMusic = function () {
+    const src = (MCFG().tracks || {}).trench; if (!src || bgmPrimed) return;
+    const el = ensureBgm(src); bgmPrimed = true;
+    const pr = el.play(); if (pr && pr.then) pr.then(() => { if (!bgmWanted) el.pause(); }).catch(() => { bgmPrimed = false; });
+  };
+  A.bgmPause = () => { if (bgm && !bgm.paused) bgm.pause(); };
+  A.bgmResume = () => { if (bgm && bgmWanted && bgm.paused) { const pr = bgm.play(); if (pr && pr.catch) pr.catch(() => {}); } };
+
   A.music = function (name) {
     if (!A.ctx) return;
+    const file = name && (MCFG().tracks || {})[name];
+    if (file) { A.track = null; bgmPlay(file); return; }
+    bgmStop();
     A.track = name ? TRACKS[name] : null;
     A.bpm = BPM[name] || 170;
     A.step = 0; A.nextTime = A.ctx.currentTime + 0.06;
