@@ -7,14 +7,41 @@
 
   try { A.muted = localStorage.getItem('aaliyah_muted') === '1'; } catch (e) {}
 
+  // iPhone: Web Audio is silenced by the ringer switch unless a media element is playing.
+  // A looping silent <audio> tag moves the page to the "playback" audio session.
+  let silentEl = null;
+  function silentWav() {
+    const n = 4410, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 44100, true); v.setUint32(28, 88200, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    let bin = ''; const u = new Uint8Array(b); for (let i = 0; i < u.length; i++) bin += String.fromCharCode(u[i]);
+    return 'data:audio/wav;base64,' + btoa(bin);
+  }
+  A.unlock = function () {
+    A.init();
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    if (!silentEl) {
+      silentEl = document.createElement('audio'); silentEl.src = silentWav(); silentEl.loop = true;
+      silentEl.setAttribute('playsinline', ''); silentEl.setAttribute('x-webkit-airplay', 'deny'); silentEl.preload = 'auto';
+    }
+    if (silentEl.paused) { const pr = silentEl.play(); if (pr && pr.catch) pr.catch(() => {}); }
+    if (A.ctx && A.ctx.state !== 'running') A.ctx.resume();
+    if (A.ctx && !A.unlocked) {
+      const src = A.ctx.createBufferSource(); src.buffer = A.ctx.createBuffer(1, 1, 22050); src.connect(A.ctx.destination); src.start(0);
+      A.unlocked = true;
+    }
+    if (A.voiceUnlock) A.voiceUnlock();
+  };
+
   A.init = function () {
     if (A.ctx) { if (A.ctx.state === 'suspended') A.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
     A.ctx = new AC();
     master = A.ctx.createGain(); master.gain.value = A.muted ? 0 : 0.8; master.connect(A.ctx.destination);
-    musicBus = A.ctx.createGain(); musicBus.gain.value = 0.32; musicBus.connect(master);
-    sfxBus = A.ctx.createGain(); sfxBus.gain.value = 0.55; sfxBus.connect(master);
+    musicBus = A.ctx.createGain(); musicBus.gain.value = 0.42; A.musicBus = musicBus; musicBus.connect(master);
+    sfxBus = A.ctx.createGain(); sfxBus.gain.value = 0.65; sfxBus.connect(master);
     noiseBuf = A.ctx.createBuffer(1, A.ctx.sampleRate, A.ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -24,8 +51,65 @@
     A.muted = m;
     try { localStorage.setItem('aaliyah_muted', m ? '1' : '0'); } catch (e) {}
     if (master) master.gain.setTargetAtTime(m ? 0 : 0.8, A.ctx.currentTime, 0.02);
+    if (m) A.stopVoice();
   };
-  A.suspend = () => { if (A.ctx && A.ctx.state === 'running') A.ctx.suspend(); };
+  A.suspend = () => { if (A.ctx && A.ctx.state === 'running') A.ctx.suspend(); A.stopVoice(); };
+
+  /* ------------------------------ VOICE ------------------------------ */
+  // Each character speaks their lines. Uses a recorded file if the line has `voice: "assets/voice/x.mp3"`,
+  // otherwise the device's text-to-speech with a per-character pitch/rate (see VOICE in config.js).
+  const VCFG = () => (window.AALIYAH_CONFIG && window.AALIYAH_CONFIG.VOICE) || {};
+  const synth = window.speechSynthesis;
+  let voices = [], fileVoice = null, lastBark = 0;
+  function loadVoices() { try { voices = synth ? synth.getVoices() : []; } catch (e) { voices = []; } }
+  if (synth) { loadVoices(); if (synth.addEventListener) synth.addEventListener('voiceschanged', loadVoices); else synth.onvoiceschanged = loadVoices; }
+  function pickVoice(who) {
+    if (!voices.length) loadVoices();
+    const en = voices.filter(v => /^en/i.test(v.lang));
+    const pool = en.length ? en : voices;
+    const want = (VCFG()[who] && VCFG()[who].voiceNames) || [];
+    for (const n of want) { const v = pool.find(x => x.name.toLowerCase().includes(n.toLowerCase())); if (v) return v; }
+    return pool[0] || null;
+  }
+  function duck(on) { if (musicBus && A.ctx) musicBus.gain.setTargetAtTime(on ? 0.16 : 0.42, A.ctx.currentTime, 0.08); }
+  A.voiceUnlock = function () {
+    if (A.voiceUnlocked || !synth) return;
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; synth.speak(u); A.voiceUnlocked = true; } catch (e) {}
+  };
+  A.stopVoice = function () {
+    try { if (synth) synth.cancel(); } catch (e) {}
+    if (fileVoice) { fileVoice.pause(); fileVoice = null; }
+    duck(false);
+  };
+  A.voiceOn = () => VCFG().enabled !== false && !A.muted;
+  A.say = function (text, who, file) {
+    if (!A.voiceOn()) return false;
+    A.stopVoice();
+    if (file) {
+      fileVoice = new Audio(file); fileVoice.setAttribute('playsinline', '');
+      fileVoice.onended = () => duck(false); duck(true);
+      const pr = fileVoice.play(); if (pr && pr.catch) pr.catch(() => duck(false));
+      return true;
+    }
+    if (!synth || VCFG().tts === false) return false;
+    const clean = String(text).replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, '').replace(/\.{3}/g, ', ').replace(/!{2,}/g, '!').replace(/\?{2,}/g, '?').trim();
+    if (!clean) return false;
+    const c = VCFG()[who] || VCFG().narrator || {};
+    const u = new SpeechSynthesisUtterance(clean);
+    const v = pickVoice(who); if (v) u.voice = v;
+    u.pitch = c.pitch != null ? c.pitch : 1; u.rate = c.rate != null ? c.rate : 1; u.volume = c.volume != null ? c.volume : 1;
+    u.onend = u.onerror = () => duck(false);
+    duck(true);
+    try { synth.speak(u); } catch (e) { return false; }
+    return true;
+  };
+  // short in-game shouts, rate-limited so they don't pile up
+  A.bark = function (text, who) {
+    if (!A.voiceOn() || VCFG().barks === false) return;
+    const now = performance.now(); if (now - lastBark < 2200) return;
+    try { if (synth && synth.speaking) return; } catch (e) {}
+    lastBark = now; A.say(text, who || 'aaliyah');
+  };
   A.resume = () => { if (A.ctx && A.ctx.state === 'suspended') A.ctx.resume(); };
 
   function tone(type, f0, t, dur, vol, dest, f1, attack) {

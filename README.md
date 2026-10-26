@@ -22,7 +22,7 @@ To put it online, upload the folder as is to any static host (GitHub Pages, Netl
 | Move | WASD / arrow keys (Shift = walk) | left thumb (floating joystick) |
 | Camera | click the game, then move the mouse · Q / E | drag with the right thumb |
 | Jump / grab ledge / pull up | Space | JUMP |
-| SOL pistols (auto lock-on) | J or left click | SHOOT (hold) |
+| SOL pistols (auto lock-on, homing shots) | J or left click | SHOOT (hold) |
 | Pull lever / let go of ledge | F | ACT (lights up when something is in reach) |
 | Pause · Mute | P / Esc · M | top-right buttons |
 
@@ -50,6 +50,11 @@ Every line of the intro and outro is plain text in `INTRO` / `OUTRO`. Each line 
 - the placeholders `{sol}`, `{clues}`, `{time}` and `{left}`.
 
 The same file holds the hints, clue texts, game-over quips, the end-screen ranks, `TIME_LIMIT` and `START_HEARTS`.
+
+### Voice, sound and touch feel: `js/config.js`
+- `VOICE`: every dialogue line is spoken aloud. Each character has their own pitch and speed, using the device's built-in voice. Short in-game shouts come from `BARKS`. For real recorded lines, add `voice: "assets/voice/line.mp3"` to any dialogue line.
+- `TOUCH.stickSensitivity` and `TOUCH.lookSensitivity` tune the joystick and the camera drag. Lower numbers are calmer.
+- On iPhone, sound plays even with the ringer switch on silent. Just tap START first.
 
 ### Aaliyah's look
 - **Portrait** (dialogue box and title): `PORTRAITS.aaliyah`, currently `assets/aaliyah.jpg`.

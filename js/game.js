@@ -43,8 +43,8 @@
   const KEY = { KeyW: 'fwd', ArrowUp: 'fwd', KeyS: 'back', ArrowDown: 'back', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
     Space: 'jump', KeyJ: 'shoot', KeyF: 'action', KeyK: 'action', KeyE: 'camR', KeyQ: 'camL', ShiftLeft: 'walk', ShiftRight: 'walk', Enter: 'advance' };
   function press(k) { pressed[k] = true; }
+  ['touchend', 'click', 'keydown', 'pointerup'].forEach(n => addEventListener(n, () => AU.unlock(), { passive: true, capture: true }));
   addEventListener('keydown', e => {
-    AU.init();
     if (e.code === 'KeyP' || (e.code === 'Escape' && !document.pointerLockElement)) { togglePause(); return; }
     if (e.code === 'KeyM') { toggleMute(); return; }
     const k = KEY[e.code]; if (!k) return;
@@ -60,7 +60,7 @@
   const cv = $('game');
   let mouseDown = false, mouseShoot = false;
   cv.addEventListener('mousedown', e => {
-    AU.init(); press('advance');
+    press('advance');
     if (state === 'play' && !paused && !IS_TOUCH) {
       if (document.pointerLockElement === cv) { mouseShoot = true; } else if (cv.requestPointerLock) { try { cv.requestPointerLock(); } catch (er) {} }
     }
@@ -73,9 +73,10 @@
 
   // touch: left = floating joystick, right = camera drag, buttons = jump/shoot/action
   const joyEl = $('joy'), knobEl = $('joy-knob');
+  const TCFG = CFG.TOUCH || {}, STICK_SENS = clamp(TCFG.stickSensitivity != null ? TCFG.stickSensitivity : 0.7, 0.2, 2),
+        LOOK_SENS = 1.9 * clamp(TCFG.lookSensitivity != null ? TCFG.lookSensitivity : 0.55, 0.1, 2), JOY_R = 78;
   const btnTouch = {};
   function onTouchStart(e) {
-    AU.init();
     for (const t of e.changedTouches) {
       const el = document.elementFromPoint(t.clientX, t.clientY), btn = el && el.closest && el.closest('[data-btn]');
       if (btn) { btnTouch[t.identifier] = btn.dataset.btn; btn.classList.add('on'); press(btn.dataset.btn); press('advance'); e.preventDefault(); continue; }
@@ -92,12 +93,12 @@
   function onTouchMove(e) {
     for (const t of e.changedTouches) {
       if (t.identifier === joy.id) {
-        const R = 55; let dx = t.clientX - joy.ox, dy = t.clientY - joy.oy; const d = Math.hypot(dx, dy);
+        const R = JOY_R; let dx = t.clientX - joy.ox, dy = t.clientY - joy.oy; const d = Math.hypot(dx, dy);
         if (d > R) { joy.ox += dx - dx / d * R; joy.oy += dy - dy / d * R; dx = dx / d * R; dy = dy / d * R; joyEl.style.left = joy.ox + 'px'; joyEl.style.top = joy.oy + 'px'; }
         joy.x = dx / R; joy.y = -dy / R;
         knobEl.style.transform = 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px))';
       } else if (t.identifier === camDrag.id) {
-        camIn.dx += (t.clientX - camDrag.lx) * 1.6; camIn.dy += (t.clientY - camDrag.ly) * 1.6; camDrag.lx = t.clientX; camDrag.ly = t.clientY;
+        camIn.dx += (t.clientX - camDrag.lx) * LOOK_SENS; camIn.dy += (t.clientY - camDrag.ly) * LOOK_SENS; camDrag.lx = t.clientX; camDrag.ly = t.clientY;
       }
     }
     if (state === 'play') e.preventDefault();
@@ -121,10 +122,20 @@
     held.shoot = !!keys.shoot || mouseShoot || btnHeld('shoot');
     held.action = !!keys.action || btnHeld('action');
     let ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), iy = (keys.fwd ? 1 : 0) - (keys.back ? 1 : 0);
-    if (joy.id !== null) { ix = joy.x; iy = joy.y; }
-    let m = Math.hypot(ix, iy); if (m > 1) { ix /= m; iy /= m; m = 1; }
-    if (m < 0.15) { ix = iy = 0; m = 0; }
-    const walk = keys.walk || (joy.id !== null && m < 0.55);
+    let m;
+    if (joy.id !== null) {
+      // deadzone + soft response curve so small thumb movements give gentle, precise control
+      const raw = Math.min(1, Math.hypot(joy.x, joy.y)), dz = 0.2;
+      if (raw < dz) { ix = iy = 0; m = 0; }
+      else {
+        const t = (raw - dz) / (1 - dz), mag = Math.min(1, Math.pow(t, 1.6) * (0.55 + STICK_SENS * 0.65));
+        ix = joy.x / raw * mag; iy = joy.y / raw * mag; m = mag;
+      }
+    } else {
+      m = Math.hypot(ix, iy); if (m > 1) { ix /= m; iy /= m; m = 1; }
+      if (m < 0.15) { ix = iy = 0; m = 0; }
+    }
+    const walk = keys.walk;
     return { ix, iy, m, walk };
   }
 
@@ -316,7 +327,7 @@
   function startDialogue(lines, done) { DLG.lines = lines; DLG.i = -1; DLG.done = done; DLG.active = true; nextLine(); }
   function nextLine() {
     DLG.i++;
-    if (DLG.i >= DLG.lines.length) { DLG.active = false; DLG.el.className = ''; const d = DLG.done; DLG.done = null; if (d) d(); return; }
+    if (DLG.i >= DLG.lines.length) { AU.stopVoice(); DLG.active = false; DLG.el.className = ''; const d = DLG.done; DLG.done = null; if (d) d(); return; }
     const ln = DLG.lines[DLG.i], who = ln.who || 'narrator';
     DLG.who = who; DLG.full = fmt(ln.text || ''); DLG.shown = 0; dlgText.textContent = '';
     dlgName.textContent = (CFG.NAMES && CFG.NAMES[who]) || '';
@@ -326,6 +337,7 @@
     dlgWrap.classList.remove('shaky');
     if (ln.shake) { shake(0.2, 0.45); void dlgWrap.offsetWidth; dlgWrap.classList.add('shaky'); }
     if (ln.sfx) AU.sfx(ln.sfx);
+    DLG.spoken = AU.say(DLG.full, who, ln.voice);
     if (ln.slam) slam(ln.slam);
     if (ln.event) dialogueEvent(ln.event);
   }
@@ -338,7 +350,7 @@
     if (DLG.shown < DLG.full.length) {
       const before = Math.floor(DLG.shown); DLG.shown = Math.min(DLG.full.length, DLG.shown + dt * (CFG.TEXT_SPEED || 50));
       const now = Math.floor(DLG.shown);
-      if (now !== before) { dlgText.textContent = DLG.full.slice(0, now); if ((DLG.blip++ % 2) === 0 && DLG.full[now - 1] !== ' ') AU.blip(DLG.who); }
+      if (now !== before) { dlgText.textContent = DLG.full.slice(0, now); if (!DLG.spoken && (DLG.blip++ % 2) === 0 && DLG.full[now - 1] !== ' ') AU.blip(DLG.who); }
     }
   }
   let tipping = false, tipT = 0;
@@ -392,14 +404,15 @@
     state = 'play'; $('skip').classList.remove('show'); DLG.active = false; DLG.el.className = '';
     P.pos.set(W.start.x, W.start.y, W.start.z); P.vel.set(0, PH.jump * 0.9, 0); P.onGround = false; P.jumping = true; P.facing = Math.PI;
     cam.yaw = 0; cam.dist = 5.2; cam.pitch = 0.3; cam.lastManual = -99;
-    AU.music('raid'); AU.sfx('jump'); slam(rpick(['LET\'S GOOO!', 'FIND TEEVINCS!', 'GO GO GO!']));
+    AU.music('raid'); AU.sfx('jump'); AU.stopVoice(); bark('start'); slam(rpick(['LET\'S GOOO!', 'FIND TEEVINCS!', 'GO GO GO!']));
     if (IS_TOUCH) toast('Left thumb: move · Right thumb: look · Hold SHOOT to blast', 3.5);
     else toast('WASD move · Mouse look (click) · SPACE jump · J / click shoot · F action', 3.5);
   }
-  function startFromTitle(withIntro) { removeTitleScene(); AU.init(); startRun(withIntro); }
+  function bark(kind, who) { const l = CFG.BARKS && CFG.BARKS[kind]; if (l && l.length) AU.bark(rpick(l), who); }
+  function startFromTitle(withIntro) { removeTitleScene(); AU.unlock(); startRun(withIntro); }
   function gameOver(kind) {
     if (state !== 'play') return;
-    state = 'gameover'; AU.music(null); AU.sfx('death'); shake(0.4, 0.5); P.st = 'dead';
+    state = 'gameover'; AU.music(null); AU.stopVoice(); AU.sfx('death'); shake(0.4, 0.5); P.st = 'dead';
     if (document.pointerLockElement) document.exitPointerLock();
     $('go-title').textContent = kind === 'time' ? CFG.TIMEOUT_TITLE : CFG.GAME_OVER_TITLE;
     $('go-quip').textContent = fmt(rpick(kind === 'time' ? CFG.TIMEOUT_QUIPS : CFG.GAME_OVER_QUIPS));
@@ -409,7 +422,7 @@
   function startOutro() {
     state = 'outro'; outroT = 0; P.vel.set(0, 0, 0); P.st = 'move'; teev.pose = 'shock';
     if (document.pointerLockElement) document.exitPointerLock();
-    AU.music(null); AU.sfx('fanfare'); shake(0.2, 0.4); $('skip').classList.add('show');
+    AU.music(null); AU.stopVoice(); AU.sfx('fanfare'); shake(0.2, 0.4); $('skip').classList.add('show');
     burst(teev.root.position.x, 2, teev.root.position.z, 60, ['#ffde3a', '#14F195', '#9945FF', '#ff5e8a'], 6, { life: 1.6, grav: 4 });
     setTimeout(() => { if (state === 'outro') startDialogue(CFG.OUTRO, showResults); }, 900);
   }
@@ -436,7 +449,7 @@
     if (paused && document.pointerLockElement) document.exitPointerLock();
     AU.sfx('pause'); if (paused) AU.suspend(); else AU.resume();
   }
-  function toggleMute() { AU.init(); AU.setMuted(!AU.muted); $('btn-mute').textContent = AU.muted ? '🔇' : '🔊'; $('btn-mute2').textContent = AU.muted ? 'SOUND: OFF' : 'SOUND: ON'; }
+  function toggleMute() { AU.unlock(); AU.setMuted(!AU.muted); $('btn-mute').textContent = AU.muted ? '🔇' : '🔊'; $('btn-mute2').textContent = AU.muted ? 'SOUND: OFF' : 'SOUND: ON'; }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { if (state === 'play' && !paused) togglePause(); AU.suspend(); } else if (!paused) AU.resume();
   });
@@ -516,7 +529,7 @@
     if (P.st === 'hang' || P.st === 'climb' || P.st === 'mantle') P.st = 'move';
     tmpV.set(P.pos.x - src.x, 0, P.pos.z - src.z); if (tmpV.lengthSq() < 0.01) tmpV.set(0, 0, 1); tmpV.normalize();
     P.vel.set(tmpV.x * 5, 6, tmpV.z * 5); P.onGround = false; P.jumping = false;
-    AU.sfx('hit'); shake(0.25, 0.3);
+    AU.sfx('hit'); shake(0.25, 0.3); bark('hurt');
     burst(P.pos.x, P.pos.y + 1.2, P.pos.z, 18, ['#ff4060', '#ffffff', '#ffcc3a'], 4);
     floatText(rpick(CFG.HURT), tmpV2.set(P.pos.x, P.pos.y + 2.2, P.pos.z), '#ff6b81');
     if (P.hearts <= 0) gameOver('dead');
@@ -527,7 +540,7 @@
     burst(P.pos.x, -1.4, P.pos.z, 40, ['#ff5a1f', '#ffd23f', '#ffffff'], 6, { lift: 3 });
     if (P.hearts <= 0) { gameOver('dead'); return; }
     P.pos.set(respawn.x, respawn.y + 0.05, respawn.z); P.vel.set(0, 0, 0); P.inv = 1.6; P.st = 'move'; P.hang = null; P.climbW = null;
-    toast(rpick(CFG.PIT), 2);
+    toast(rpick(CFG.PIT), 2); bark('pit');
     const B = W.boulderState;
     if (B.triggered && !B.done) { B.triggered = false; if (B.mesh) { worldGroup.remove(B.mesh); B.mesh = null; } AU.setTempo(172); W.hurdles.forEach(h => { h.active = true; h.mesh.visible = true; }); }
   }
@@ -601,15 +614,16 @@
     // ---- normal movement
     const control = p.hurtT <= 0;
     const maxS = p.pushing ? PH.push : inp.walk ? PH.walk : PH.run;
+    // wish already carries the analog magnitude (0..1), so a half-pushed stick = half speed
     const tvx = control ? wish.x * maxS : 0, tvz = control ? wish.z * maxS : 0;
-    const acc = (p.onGround ? PH.accel : PH.airAccel) * dt;
+    const acc = (p.onGround ? (IS_TOUCH ? PH.accel * 0.6 : PH.accel) : PH.airAccel) * dt;
     const dvx = tvx - p.vel.x, dvz = tvz - p.vel.z, dl = Math.hypot(dvx, dvz);
     if (control || p.onGround) { if (dl <= acc) { p.vel.x = tvx; p.vel.z = tvz; } else { p.vel.x += dvx / dl * acc; p.vel.z += dvz / dl * acc; } }
     p.speed = Math.hypot(p.vel.x, p.vel.z);
     // facing
-    const shooting = held.shoot && control;
-    if (shooting && p.target) p.facing = lerpAngle(p.facing, Math.atan2(p.target.pos.x - p.pos.x, p.target.pos.z - p.pos.z), Math.min(1, dt * 18));
-    else if (inp.m > 0.1 && control) p.facing = lerpAngle(p.facing, Math.atan2(wish.x, wish.z), Math.min(1, dt * 14));
+    const shooting = (held.shoot || pressed.shoot) && control;
+    if (shooting && p.target) p.facing = lerpAngle(p.facing, Math.atan2(p.target.pos.x - p.pos.x, p.target.pos.z - p.pos.z), Math.min(1, dt * 30));
+    else if (inp.m > 0.1 && control) p.facing = lerpAngle(p.facing, Math.atan2(wish.x, wish.z), Math.min(1, dt * (IS_TOUCH ? 9 : 14)));
     // jump
     if (p.jumpBuf > 0 && p.coyote > 0 && control) {
       p.vel.y = PH.jump; p.jumpBuf = 0; p.coyote = 0; p.onGround = false; p.jumping = true; AU.sfx('jump');
@@ -640,7 +654,7 @@
     // fell off something while running: allow a quick grab of the ledge we came from? (keep simple)
 
     // ---- shooting
-    if (p.retargetT <= 0 || (p.target && !p.target.alive)) { p.retargetT = 0.25; p.target = findTarget(); }
+    if (pressed.shoot || p.retargetT <= 0 || (p.target && !p.target.alive)) { p.retargetT = 0.15; p.target = findTarget(held.shoot || pressed.shoot); }
     if (shooting && p.st === 'move' && p.shootCd <= 0) fireBolt();
     p.shootT = shooting ? 0.25 : Math.max(0, p.shootT - dt);
   }
@@ -663,30 +677,48 @@
   }
 
   /* ============================== COMBAT ================================ */
-  function findTarget() {
+  // Aim assist: holding SHOOT locks onto the best enemy in ANY direction (closest, preferring what's
+  // in front), keeps that lock while it's valid, and bolts home in on it. No manual aiming needed.
+  function canSee(e, d) {
+    if (d < 4) return true;
+    tmpV.set(P.pos.x, P.pos.y + 1.3, P.pos.z);
+    tmpV2.set(e.pos.x - P.pos.x, e.pos.y + (e.type === 'goblin' ? 1.15 : 0) - P.pos.y - 1.3, e.pos.z - P.pos.z).normalize();
+    ray.set(tmpV, tmpV2); ray.far = d; return ray.intersectObjects(W.rayMeshes, false).length === 0;
+  }
+  function findTarget(shooting) {
+    const range = shooting ? 22 : 16, cone = shooting ? Math.PI : 1.6;
+    const cur = P.target;
+    if (cur && cur.alive) {
+      const d = Math.hypot(cur.pos.x - P.pos.x, cur.pos.z - P.pos.z);
+      if (d < range + 2 && Math.abs(cur.pos.y - P.pos.y) < 7 && canSee(cur, d)) {
+        // keep the lock unless something is right in our face
+        let closer = null;
+        for (const e of enemies) if (e.alive && e !== cur && Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z) < Math.min(3.5, d * 0.5)) closer = e;
+        if (!closer) return cur;
+      }
+    }
     let best = null, bd = 1e9;
     for (const e of enemies) {
       if (!e.alive) continue;
       const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz);
-      if (d > 17 || Math.abs(e.pos.y - P.pos.y) > 6) continue;
-      const ref = (P.speed > 0.5 || held.shoot) ? P.facing : cam.yaw + Math.PI;
+      if (d > range || Math.abs(e.pos.y - P.pos.y) > 7) continue;
+      const ref = P.speed > 0.5 ? P.facing : cam.yaw + Math.PI;
       const a = Math.abs(angDiff(ref, Math.atan2(dx, dz)));
-      if (a > 1.4) continue;
-      // line of sight
-      tmpV.set(P.pos.x, P.pos.y + 1.3, P.pos.z); tmpV2.set(dx, e.pos.y + 0.7 - P.pos.y - 1.3, dz).normalize();
-      ray.set(tmpV, tmpV2); ray.far = d; if (ray.intersectObjects(W.rayMeshes, false).length) continue;
-      const score = d + a * 4; if (score < bd) { bd = score; best = e; }
+      if (a > cone) continue;
+      if (!canSee(e, d)) continue;
+      const score = d + a * 2.5; if (score < bd) { bd = score; best = e; }
     }
     return best;
   }
   function fireBolt() {
-    P.shootCd = 0.16; P.gun = 1 - P.gun;
+    P.shootCd = 0.15; P.gun = 1 - P.gun;
     const b = bolts.find(q => q.life <= 0); if (!b) return;
     const side = P.gun ? 1 : -1, f = P.facing;
     b.m.position.set(P.pos.x + Math.sin(f) * 0.5 + Math.cos(f) * 0.2 * side, P.pos.y + 1.3, P.pos.z + Math.cos(f) * 0.5 - Math.sin(f) * 0.2 * side);
-    if (P.target) { tmpV.set(P.target.pos.x, P.target.pos.y + (P.target.type === 'goblin' ? 0.75 : 0), P.target.pos.z).sub(b.m.position).normalize(); }
+    b.target = P.target && P.target.alive ? P.target : null;
+    if (b.target) tmpV.set(b.target.pos.x, b.target.pos.y + (b.target.type === 'goblin' ? 1.05 : 0), b.target.pos.z).sub(b.m.position).normalize();
     else tmpV.set(Math.sin(f), 0, Math.cos(f));
-    b.vel.copy(tmpV).multiplyScalar(32); b.life = 0.8; b.m.visible = true;
+    b.vel.copy(tmpV).multiplyScalar(30); b.life = 1.0; b.m.visible = true;
     AU.sfx('whip');
   }
   function killEnemy(e) {
@@ -694,7 +726,7 @@
     const c = e.type === 'goblin' ? ['#5fcf4a', '#2f7d32', '#ffffff', '#14F195'] : ['#6d2cb0', '#e94b3c', '#ffffff'];
     burst(e.pos.x, e.pos.y + 0.7, e.pos.z, 30, c, 6);
     floatText(rpick(e.type === 'goblin' ? ['-FUD!', 'BONK!', 'YEET!', 'FUD REKT'] : ['UN-RUGGED!', 'BYE BAT!', 'YEET!']), tmpV2.set(e.pos.x, e.pos.y + 1.8, e.pos.z), '#ffffff');
-    AU.sfx('stomp'); shake(0.1, 0.15);
+    AU.sfx('stomp'); shake(0.1, 0.15); if (Math.random() < 0.5) bark('kill');
     if (Math.random() < 0.6) { W.coins.push({ x: e.pos.x, y: Math.max(e.pos.y, groundAt(e.pos.x, e.pos.z, e.pos.y + 1)) + 0.8, z: e.pos.z, taken: false, ph: 0 }); W.totalCoins++; growCoins(); }
   }
   function growCoins() {
@@ -705,11 +737,16 @@
   function updateBolts(dt) {
     for (const b of bolts) {
       if (b.life <= 0) continue;
-      b.life -= dt; b.m.position.addScaledVector(b.vel, dt);
+      b.life -= dt;
+      if (b.target && b.target.alive) {
+        const t = b.target; tmpV.set(t.pos.x, t.pos.y + (t.type === 'goblin' ? 1.05 : 0), t.pos.z).sub(b.m.position).normalize().multiplyScalar(30);
+        b.vel.lerp(tmpV, Math.min(1, dt * 16));
+      }
+      b.m.position.addScaledVector(b.vel, dt);
       const p = b.m.position; let dead = b.life <= 0;
       for (const e of enemies) {
         if (!e.alive) continue;
-        const cy = e.type === 'goblin' ? e.pos.y + 0.75 : e.pos.y, rr = e.type === 'goblin' ? 0.6 : 0.45;
+        const cy = e.type === 'goblin' ? e.pos.y + 0.85 : e.pos.y, rr = e.type === 'goblin' ? 0.85 : 0.7;
         if ((p.x - e.pos.x) ** 2 + (p.y - cy) ** 2 + (p.z - e.pos.z) ** 2 < rr * rr) {
           e.hp--; e.hitT = 0.15; dead = true;
           burst(p.x, p.y, p.z, 8, ['#14F195', '#ffffff'], 3, { life: 0.3 });
@@ -797,7 +834,7 @@
       if (c.taken) continue;
       c.mesh.rotation.y = t * 1.5; c.mesh.position.y = c.y + Math.sin(t * 2) * 0.12; c.halo.rotation.z = t;
       if (playing && Math.hypot(c.x - p.pos.x, c.z - p.pos.z) < 0.9 && Math.abs(c.y - (p.pos.y + 0.9)) < 1.3) {
-        c.taken = true; c.mesh.visible = false; p.clues++; AU.sfx('clue'); shake(0.15, 0.25);
+        c.taken = true; c.mesh.visible = false; p.clues++; AU.sfx('clue'); shake(0.15, 0.25); bark('clue');
         burst(c.x, c.y, c.z, 40, ['#ffde3a', '#ffffff', '#14F195'], 5, { grav: 3 });
         floatText('CLUE ' + p.clues + '/3!', tmpV2.set(c.x, c.y + 0.8, c.z), '#ffde3a');
         toast(CFG.CLUES[(p.clues - 1) % CFG.CLUES.length] + (p.clues >= 3 ? '  —  ' + CFG.ALL_CLUES : ''), 3.8);
@@ -816,7 +853,7 @@
       if (!k.lit && playing && p.pos.z < k.z + 0.5 && p.st === 'move' && p.onGround) {
         k.lit = true; respawn = { x: k.x + 1.2 * Math.sign(-k.x || 1), y: k.y, z: k.z };
         k.flame.material.color.set(0x14f195); k.flame.material.emissive.set(0x9945ff); k.flame.scale.setScalar(1.4);
-        if (k.z < W.start.z - 2) { AU.sfx('checkpoint'); floatText(rpick(CFG.CHECKPOINT), tmpV2.set(k.x, 2.4, k.z), '#ffde3a'); }
+        if (k.z < W.start.z - 2) { AU.sfx('checkpoint'); bark('checkpoint'); floatText(rpick(CFG.CHECKPOINT), tmpV2.set(k.x, 2.4, k.z), '#ffde3a'); }
         burst(k.x, 1.8, k.z, 20, ['#14F195', '#9945FF'], 2.5, { grav: -2 });
       }
     }
@@ -889,7 +926,7 @@
     // door proximity
     doorMsgCd -= dt;
     if (playing && W.door.active && !W.door.opening && Math.abs(p.pos.x) < 2.5 && p.pos.z < -205 && p.pos.z > -210.5) {
-      if (p.clues >= 3) { W.door.opening = true; AU.sfx('door'); shake(0.3, 1.4); toast(CFG.DOOR_OPEN, 2.6); burst(0, 2, -207.6, 50, ['#ffde3a', '#14F195', '#ffffff'], 6); }
+      if (p.clues >= 3) { W.door.opening = true; AU.sfx('door'); bark('door'); shake(0.3, 1.4); toast(CFG.DOOR_OPEN, 2.6); burst(0, 2, -207.6, 50, ['#ffde3a', '#14F195', '#ffffff'], 6); }
       else if (doorMsgCd <= 0) { doorMsgCd = 3; toast(CFG.DOOR_LOCKED, 2.8); AU.sfx('lever'); }
     }
     // Teevincs
@@ -913,7 +950,7 @@
       }) }));
       m.castShadow = SHADOWS; m.position.set(0, 9, cfg.startZ); worldGroup.add(m);
       B.mesh = m; B.v = 1.5; B.vy = 0; B.falling = true; B.pit = false;
-      slam(CFG.CHASE_START); AU.setTempo(205); rumbleT = 0;
+      slam(CFG.CHASE_START); AU.setTempo(205); rumbleT = 0; AU.stopVoice(); bark('boulder');
     }
     if (!B.triggered || B.done || !B.mesh) return;
     const m = B.mesh, r = 1.9;
@@ -943,6 +980,7 @@
       if (manual) { cam.yaw -= camIn.dx * 0.0042; cam.pitch = clamp(cam.pitch + camIn.dy * 0.003, -0.25, 1.15); cam.lastManual = G.t; }
       if (keys.camL) { cam.yaw += dt * 2.2; cam.lastManual = G.t; }
       if (keys.camR) { cam.yaw -= dt * 2.2; cam.lastManual = G.t; }
+      if (held.shoot && P.target && P.target.alive && G.t - cam.lastManual > 0.6) cam.yaw = lerpAngle(cam.yaw, P.facing + Math.PI, Math.min(1, dt * 3));
       // auto-follow behind the player while running forward-ish
       if (G.t - cam.lastManual > 1.4 && P.speed > 2 && P.st === 'move') {
         const behind = P.facing + Math.PI, d = Math.abs(angDiff(cam.yaw, behind));
@@ -1121,8 +1159,8 @@
     $('btn-mute').textContent = AU.muted ? '🔇' : '🔊'; $('btn-mute2').textContent = AU.muted ? 'SOUND: OFF' : 'SOUND: ON';
     const go = intro => () => startFromTitle(intro);
     $('btn-start').onclick = go(true); $('btn-quick').onclick = go(false);
-    $('btn-retry').onclick = () => { AU.init(); startRun(false); };
-    $('btn-again').onclick = () => { AU.init(); startRun(!!CFG.INTRO_ON_REPLAY); };
+    $('btn-retry').onclick = () => { AU.unlock(); startRun(false); };
+    $('btn-again').onclick = () => { AU.unlock(); startRun(!!CFG.INTRO_ON_REPLAY); };
     $('btn-resume').onclick = () => togglePause();
     $('btn-restart').onclick = () => { paused = false; AU.resume(); startRun(false); };
     $('btn-pause').onclick = e => { e.stopPropagation(); togglePause(); };
@@ -1130,6 +1168,7 @@
     $('btn-mute2').onclick = () => toggleMute();
     $('skip').onclick = e => {
       e.stopPropagation();
+      AU.stopVoice();
       if (state === 'intro') { introLines = null; DLG.done = null; DLG.active = false; beginPlay(); }
       else if (state === 'outro') { DLG.active = false; DLG.done = null; DLG.el.className = ''; showResults(); }
     };

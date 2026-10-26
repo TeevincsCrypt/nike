@@ -76,7 +76,7 @@ body.ingame #hud { display: flex; }
   text-shadow: 0 2px 0 #140628, 0 0 8px rgba(0,0,0,.6); white-space: nowrap; }
 
 /* ---------- touch controls ---------- */
-#joy { position: fixed; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35);
+#joy { position: fixed; width: 156px; height: 156px; margin: -78px 0 0 -78px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35);
   background: rgba(20,6,40,.3); z-index: 11; display: none; pointer-events: none; }
 #joy.on { display: block; }
 #joy-knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; border-radius: 50%; background: rgba(153,69,255,.7); border: 2px solid var(--green); transform: translate(-50%,-50%); }

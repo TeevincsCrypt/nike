@@ -39,6 +39,32 @@ window.AALIYAH_CONFIG = {
     teevincsScale: 1
   },
 
+  // Voices. Uses the phone/computer's built-in speech voice, tuned per character.
+  // To use real recorded voice lines instead, add  voice: "assets/voice/line1.mp3"  to any dialogue line.
+  VOICE: {
+    enabled: true,       // speak dialogue lines
+    barks: true,         // short in-game shouts ("OW!", "YEET!")
+    aaliyah:  { pitch: 1.55, rate: 1.12, voiceNames: ["Samantha", "Karen", "Moira", "Tessa", "Zira", "Google US English", "Female"] },
+    teevincs: { pitch: 0.75, rate: 1.0,  voiceNames: ["Daniel", "Alex", "Fred", "Aaron", "David", "Google UK English Male", "Male"] },
+    narrator: { pitch: 0.5,  rate: 0.92, voiceNames: ["Daniel", "Alex", "Fred", "Google UK English Male", "Male"] }
+  },
+  BARKS: {
+    start: ["Let's go!", "Teevincs, I'm coming!", "Birthday mission, go go go!"],
+    hurt: ["Ow!", "Rude!", "My hat!", "Not today!", "Ouch!"],
+    kill: ["Yeet!", "Bonk!", "Bye FUD!", "Get rugged!", "Too easy!"],
+    clue: ["A clue!", "Ooh, a clue!", "Big brain moment!"],
+    checkpoint: ["Checkpoint!", "Saved my vibes!"],
+    boulder: ["Nope nope nope!", "RUN!", "Why is it always a boulder!"],
+    door: ["It's open!", "Birthday door, let me in!"],
+    pit: ["I meant to do that.", "Lava? Really?"]
+  },
+
+  // Touch controls (phones). Lower = calmer.
+  TOUCH: {
+    stickSensitivity: 0.7,   // how fast the joystick reaches full run (0.3 – 1.5)
+    lookSensitivity: 0.55    // camera drag speed with the right thumb (0.2 – 1.5)
+  },
+
   TIME_LIMIT: 240,          // seconds until Teevincs' birthday (fail state)
   START_HEARTS: 3,
   SOL_PER_FRAGMENT: 1,      // tip amount per collected fragment
